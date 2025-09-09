@@ -1,11 +1,11 @@
 // =============================================================================
 // COMPONENT: Bottom Navigation
-// File path: src/components/layout/BottomNavigation.tsx
+// File path: src/components/navigation/BottomNavigation.tsx
+// =============================================================================
 
 import { Home, MapPin, Bell, User, Zap, AlertTriangle } from "lucide-react";
 import type { ActiveTab, SOSState } from "../../types";
 
-// =============================================================================
 interface BottomNavigationProps {
   activeTab: ActiveTab;
   onTabChange: (tab: ActiveTab) => void;
@@ -18,7 +18,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
   activeTab,
   onTabChange,
   onSOSPress,
-  notificationCount
+  notificationCount,
 }) => (
   <div className="fixed bottom-0 left-0 right-0 max-w-sm mx-auto bg-white border-t border-gray-200 px-4 py-2 shadow-lg">
     <div className="flex justify-around items-center">
@@ -32,16 +32,24 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
           badge: notificationCount,
         },
         { tab: "profile" as ActiveTab, icon: User, label: "Profile" },
-        { tab: "SOS" as ActiveTab, icon: AlertTriangle, label: "SOS" },
-      ].map(({ tab, icon: Icon, label, badge }) => (
+        { tab: "SOS" as ActiveTab, icon: AlertTriangle, label: "SOS", isSpecial: true },
+      ].map(({ tab, icon: Icon, label, badge, isSpecial }) => (
         <button
           key={tab}
-          onClick={() => {onTabChange(tab);
-            onSOSPress()
+          onClick={() => {
+            if (isSpecial) {
+              onSOSPress();
+            } else {
+              onTabChange(tab);
+            }
           }}
           className={`flex flex-col items-center p-3 rounded-xl transition-all duration-200 ${
             activeTab === tab
-              ? "bg-black text-white"
+              ? isSpecial
+                ? "bg-red-500 text-white"
+                : "bg-black text-white"
+              : isSpecial
+              ? "text-red-500 hover:text-red-700"
               : "text-gray-500 hover:text-gray-900"
           }`}
         >
@@ -59,4 +67,5 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
     </div>
   </div>
 );
+
 export default BottomNavigation;

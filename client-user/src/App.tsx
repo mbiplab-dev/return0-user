@@ -6,8 +6,10 @@ import HomeScreen from "./components/screens/HomeScreen";
 import MapScreen from "./components/screens/MapScreen";
 import NotificationScreen from "./components/screens/NotificationScreen";
 import ProfileScreen from "./components/screens/ProfileScreen";
+import AddTripScreen from "./components/screens/AddTripScreen";
 import SOSInterface from "./components/sos/SosInterface";
 import type { ActiveTab, SOSState, GroupMember, Notification } from "./types";
+import type { Trip } from "./types/trip";
 
 // Mapbox access token
 mapboxgl.accessToken = import.meta.env.VITE_REACT_APP_MAPBOX_TOKEN;
@@ -24,9 +26,11 @@ const SmartTouristApp: React.FC = () => {
   const [swipeProgress, setSwipeProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartX, setDragStartX] = useState(0);
+  
   // App data
   const [currentLocation] = useState("Dubai Marina, UAE");
   const [safetyScore] = useState(85);
+  const [trips, setTrips] = useState<Trip[]>([]);
 
   // Map refs
   const mapContainer = useRef<HTMLDivElement | null>(null);
@@ -102,6 +106,26 @@ const SmartTouristApp: React.FC = () => {
       location: "Dubai Marina",
     },
   ]);
+
+  // Trip management functions
+  const handleSaveTrip = (tripData: Omit<Trip, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newTrip: Trip = {
+      ...tripData,
+      id: Math.random().toString(36).substr(2, 9),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    setTrips(prev => [...prev, newTrip]);
+    console.log('Trip saved:', newTrip);
+  };
+
+  const handleAddTripPress = () => {
+    setActiveTab("addTrip");
+  };
+
+  const handleBackFromAddTrip = () => {
+    setActiveTab("home");
+  };
 
   // Map initialization
   useEffect(() => {
@@ -197,8 +221,12 @@ const SmartTouristApp: React.FC = () => {
 
   // SOS handlers
   const handleSOSPress = () => {
-    setSosState("swipe");
-    setSwipeProgress(0);
+    if (activeTab !== "SOS") {
+      setActiveTab("SOS");
+    } else {
+      setSosState("swipe");
+      setSwipeProgress(0);
+    }
   };
 
   const handleSwipeStart = (e: React.MouseEvent | React.TouchEvent) => {
@@ -269,6 +297,7 @@ const SmartTouristApp: React.FC = () => {
     setSosState("inactive");
     setSwipeProgress(0);
     setIsDragging(false);
+    setActiveTab("home");
 
     if (sosMapRef.current) {
       sosMapRef.current.remove();
@@ -285,6 +314,8 @@ const SmartTouristApp: React.FC = () => {
             safetyScore={safetyScore}
             groupMembers={groupMembers}
             notifications={notifications}
+            onAddTripPress={handleAddTripPress}
+            trips={trips}
           />
         );
       case "map":
@@ -295,6 +326,13 @@ const SmartTouristApp: React.FC = () => {
         return <NotificationScreen notifications={notifications} />;
       case "profile":
         return <ProfileScreen />;
+      case "addTrip":
+        return (
+          <AddTripScreen 
+            onBack={handleBackFromAddTrip}
+            onSaveTrip={handleSaveTrip}
+          />
+        );
       case "SOS":
         return (
           <SOSInterface

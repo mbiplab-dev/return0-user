@@ -1,30 +1,8 @@
-// Types and Interfaces
-export interface Notification {
-  id: number;
-  type: "warning" | "info" | "success" | "emergency" | "health";
-  message: string;
-  time: string;
-  priority: "low" | "medium" | "high" | "critical";
-}
+// =============================================================================
+// TYPES: Trip Related Types
+// File path: src/types/trip.ts
+// =============================================================================
 
-export interface GroupMember {
-  id: number;
-  name: string;
-  status: "safe" | "warning" | "danger";
-  lastSeen: string;
-  location: string;
-  avatar?: string;
-}
-
-export type SOSState = "inactive" | "swipe" | "sending" | "sent" | "waiting";
-export type ActiveTab = "home" | "map" | "notifications" | "profile" | "SOS" | "addTrip";
-
-export interface GroupMemberItemProps {
-  member: GroupMember;
-  showLocation?: boolean;
-}
-
-// Trip related types
 export interface PhoneNumber {
   id: string;
   number: string;

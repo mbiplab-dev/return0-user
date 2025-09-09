@@ -12,6 +12,7 @@ import { AlertTriangle, Locate, Navigation, Search, Users } from "lucide-react";
 import GroupMemberItem from "../common/GroupMemberItem";
 import Header from "../layout/Header";
 import type { GroupMember } from "../../types";
+import { toast } from "react-hot-toast";
 
 interface MapScreenProps {
   groupMembers: GroupMember[];
@@ -78,13 +79,15 @@ const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
         let found = false;
         geojsonDataRef.current.features.forEach((feature: any) => {
           if (turf.booleanPointInPolygon(point, feature)) {
-            console.log("Marker dropped in restricted area:", feature.properties);
+             toast.error(
+              `🚨 Marker dropped in restricted area: ${feature.properties.name || "Unnamed"}`
+            );
             found = true;
           }
         });
 
         if (!found) {
-          console.log("Marker is not inside any restricted area");
+          toast.success("✅ Marker is in a safe zone");
         }
       });
     });

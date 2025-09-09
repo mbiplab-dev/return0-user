@@ -3,16 +3,19 @@
 // File path: src/screens/HomeScreen.tsx
 // =============================================================================
 
-import { Bell, Heart, MapPin, Phone, QrCode, Shield, Star, Users } from "lucide-react";
+import { Bell, Heart, MapPin, Phone, QrCode, Shield, Star, Users, Plus, Calendar, Plane } from "lucide-react";
 import QuickActionButton from "../common/QuickActionButton";
 import StatusCard from "../common/StatusCard";
 import type { GroupMember, Notification } from "../../types";
+import type { Trip } from "../../types/trip";
 
 interface HomeScreenProps {
   currentLocation: string;
   safetyScore: number;
   groupMembers: GroupMember[];
   notifications: Notification[];
+  onAddTripPress: () => void;
+  trips: Trip[];
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -20,6 +23,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   safetyScore,
   groupMembers,
   notifications,
+  onAddTripPress,
+  trips,
 }) => (
   <div className="space-y-6 p-4">
     {/* Welcome Header */}
@@ -69,6 +74,55 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </div>
     </div>
+
+    {/* Add Trip Button - Prominent placement */}
+    <button
+      onClick={onAddTripPress}
+      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+    >
+      <div className="flex items-center justify-center space-x-3">
+        <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+          <Plus size={24} />
+        </div>
+        <div className="text-left">
+          <h3 className="text-lg font-bold">Plan New Trip</h3>
+          <p className="text-blue-100 text-sm">Add destinations, members & itinerary</p>
+        </div>
+        <Plane size={28} className="text-white/80" />
+      </div>
+    </button>
+
+    {/* Current Trips */}
+    {trips.length > 0 && (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900">Your Trips</h3>
+          <button className="text-sm text-blue-600 font-medium">View all</button>
+        </div>
+        <div className="space-y-3">
+          {trips.slice(0, 2).map((trip) => (
+            <div key={trip.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-gray-900">{trip.name}</h4>
+                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                  {trip.members.length} members
+                </span>
+              </div>
+              <div className="flex items-center space-x-4 text-sm text-gray-600">
+                <div className="flex items-center space-x-1">
+                  <MapPin size={14} />
+                  <span>{trip.destination}</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Calendar size={14} />
+                  <span>{new Date(trip.startDate).toLocaleDateString()}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
 
     {/* Quick Actions */}
     <div className="grid grid-cols-2 gap-4">
