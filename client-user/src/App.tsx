@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+
+// Auth Components
+import LoginScreen from "./components/auth/LoginScreen";
+import SignupScreen from "./components/auth/SignupScreen";
+
+// Main App Components
 import BottomNavigation from "./components/navigation/BottomNavigation";
 import HomeScreen from "./components/screens/HomeScreen";
 import MapScreen from "./components/screens/MapScreen";
@@ -8,6 +16,8 @@ import NotificationScreen from "./components/screens/NotificationScreen";
 import ProfileScreen from "./components/screens/ProfileScreen";
 import AddTripScreen from "./components/screens/AddTripScreen";
 import SOSInterface from "./components/sos/SosInterface";
+
+// Types
 import type { ActiveTab, SOSState, GroupMember, Notification } from "./types";
 import type { Trip } from "./types/trip";
 
@@ -20,6 +30,9 @@ mapboxgl.accessToken = import.meta.env.VITE_REACT_APP_MAPBOX_TOKEN;
 // =============================================================================
 
 const SmartTouristApp: React.FC = () => {
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
   // State management
   const [activeTab, setActiveTab] = useState<ActiveTab>("home");
   const [sosState, setSosState] = useState<SOSState>("inactive");
@@ -107,6 +120,19 @@ const SmartTouristApp: React.FC = () => {
     },
   ]);
 
+  // Authentication handlers
+  const handleAuthSuccess = () => {
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setActiveTab("home");
+    setSosState("inactive");
+    setSwipeProgress(0);
+    setIsDragging(false);
+  };
+
   // Trip management functions
   const handleSaveTrip = (tripData: Omit<Trip, 'id' | 'createdAt' | 'updatedAt'>) => {
     const newTrip: Trip = {
@@ -129,7 +155,7 @@ const SmartTouristApp: React.FC = () => {
 
   // Map initialization
   useEffect(() => {
-    if (activeTab !== "map" || !mapContainer.current || mapRef.current) return;
+    if (!isAuthenticated || activeTab !== "map" || !mapContainer.current || mapRef.current) return;
 
     mapRef.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -179,11 +205,11 @@ const SmartTouristApp: React.FC = () => {
         mapRef.current = null;
       }
     };
-  }, [activeTab, groupMembers]);
+  }, [activeTab, groupMembers, isAuthenticated]);
 
   // SOS Map initialization
   useEffect(() => {
-    if (sosState !== "waiting") {
+    if (!isAuthenticated || sosState !== "waiting") {
       if (sosMapRef.current) {
         sosMapRef.current.remove();
         sosMapRef.current = null;
@@ -217,7 +243,7 @@ const SmartTouristApp: React.FC = () => {
         .setLngLat([55.2658, 25.1998])
         .addTo(sosMapRef.current!);
     });
-  }, [sosState]);
+  }, [sosState, isAuthenticated]);
 
   // SOS handlers
   const handleSOSPress = () => {
@@ -275,7 +301,7 @@ const SmartTouristApp: React.FC = () => {
 
   // Global swipe event listeners
   useEffect(() => {
-    if (isDragging) {
+    if (isDragging && isAuthenticated) {
       const handleMove = (e: MouseEvent | TouchEvent) => handleSwipeMove(e);
       const handleEnd = () => handleSwipeEnd();
 
@@ -291,7 +317,7 @@ const SmartTouristApp: React.FC = () => {
         document.removeEventListener("touchend", handleEnd);
       };
     }
-  }, [isDragging, dragStartX]);
+  }, [isDragging, dragStartX, isAuthenticated]);
 
   const closeSOS = () => {
     setSosState("inactive");
@@ -305,63 +331,150 @@ const SmartTouristApp: React.FC = () => {
     }
   };
 
-  const renderScreen = () => {
-    switch (activeTab) {
-      case "home":
-        return (
-          <HomeScreen
-            currentLocation={currentLocation}
-            safetyScore={safetyScore}
-            groupMembers={groupMembers}
-            notifications={notifications}
-            onAddTripPress={handleAddTripPress}
-            trips={trips}
-          />
-        );
-      case "map":
-        return (
-          <MapScreen groupMembers={groupMembers} mapContainer={mapContainer} />
-        );
-      case "notifications":
-        return <NotificationScreen notifications={notifications} />;
-      case "profile":
-        return <ProfileScreen />;
-      case "addTrip":
-        return (
-          <AddTripScreen 
-            onBack={handleBackFromAddTrip}
-            onSaveTrip={handleSaveTrip}
-          />
-        );
-      case "SOS":
-        return (
-          <SOSInterface
-            sosState={sosState}
-            swipeProgress={swipeProgress}
-            currentLocation={currentLocation}
-            onSwipeStart={handleSwipeStart}
-            onClose={closeSOS}
-            sosMapContainer={sosMapContainer}
-          />
-        );
-      default:
-        return null;
-    }
+  // Main App Component (after authentication)
+  const MainApp: React.FC = () => {
+    const renderScreen = () => {
+      switch (activeTab) {
+        case "home":
+          return (
+            <HomeScreen
+              currentLocation={currentLocation}
+              safetyScore={safetyScore}
+              groupMembers={groupMembers}
+              notifications={notifications}
+              onAddTripPress={handleAddTripPress}
+              trips={trips}
+            />
+          );
+        case "map":
+          return (
+            <MapScreen groupMembers={groupMembers} mapContainer={mapContainer} />
+          );
+        case "notifications":
+          return <NotificationScreen notifications={notifications} />;
+        case "profile":
+          return <ProfileScreen />;
+        case "addTrip":
+          return (
+            <AddTripScreen 
+              onBack={handleBackFromAddTrip}
+              onSaveTrip={handleSaveTrip}
+            />
+          );
+        case "SOS":
+          return (
+            <SOSInterface
+              sosState={sosState}
+              swipeProgress={swipeProgress}
+              currentLocation={currentLocation}
+              onSwipeStart={handleSwipeStart}
+              onClose={closeSOS}
+              sosMapContainer={sosMapContainer}
+            />
+          );
+        default:
+          return null;
+      }
+    };
+
+    return (
+      <div className="max-w-sm mx-auto bg-gray-50 min-h-screen relative">
+        <div className="pb-20">{renderScreen()}</div>
+        <BottomNavigation
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onSOSPress={handleSOSPress}
+          notificationCount={
+            notifications.filter((n) => n.priority === "high").length
+          }
+          sosState={sosState}
+        />
+      </div>
+    );
   };
 
   return (
-    <div className="max-w-sm mx-auto bg-gray-50 min-h-screen relative">
-      <div className="pb-20">{renderScreen()}</div>
-      <BottomNavigation
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        onSOSPress={handleSOSPress}
-        notificationCount={
-          notifications.filter((n) => n.priority === "high").length
-        }
-        sosState={sosState}
-      />
-    </div>
+    <Router>
+      <div className="App">
+        {/* Toast Notifications */}
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: '#363636',
+              color: '#fff',
+            },
+            success: {
+              duration: 3000,
+              iconTheme: {
+                primary: '#4ade80',
+                secondary: '#fff',
+              },
+            },
+            error: {
+              duration: 4000,
+              iconTheme: {
+                primary: '#ef4444',
+                secondary: '#fff',
+              },
+            },
+          }}
+        />
+
+        <Routes>
+          {/* Authentication Routes */}
+          <Route 
+            path="/login" 
+            element={
+              !isAuthenticated ? (
+                <LoginScreen onAuthSuccess={handleAuthSuccess} />
+              ) : (
+                <Navigate to="/app" replace />
+              )
+            } 
+          />
+          <Route 
+            path="/signup" 
+            element={
+              !isAuthenticated ? (
+                <SignupScreen onAuthSuccess={handleAuthSuccess} />
+              ) : (
+                <Navigate to="/app" replace />
+              )
+            } 
+          />
+
+          {/* Main App Route */}
+          <Route 
+            path="/app" 
+            element={
+              isAuthenticated ? (
+                <MainApp />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            } 
+          />
+
+          {/* Default Route */}
+          <Route 
+            path="/" 
+            element={
+              <Navigate to={isAuthenticated ? "/app" : "/login"} replace />
+            } 
+          />
+
+          {/* Catch all route */}
+          <Route 
+            path="*" 
+            element={
+              <Navigate to={isAuthenticated ? "/app" : "/login"} replace />
+            } 
+          />
+        </Routes>
+      </div>
+    </Router>
   );
 };
 
