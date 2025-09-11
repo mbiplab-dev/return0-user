@@ -115,7 +115,7 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
 
             {/* Swipe Control */}
             <div className="bg-white rounded-2xl p-4 shadow-sm">
-              <div className="relative h-16 bg-gray-200 rounded-full flex items-center px-2 overflow-hidden">
+              <div className="relative h-16 bg-red-600 rounded-full flex items-center px-2 overflow-hidden">
 
                 {/* Slider button */}
                 <div
@@ -139,7 +139,7 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
                 {/* Text overlay */}
                 {swipeProgress < 50 && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                    <span className="text-gray-600 font-medium text-sm ml-8">
+                    <span className="text-white font-medium text-sm ml-8">
                       Slide to send SOS
                     </span>
                   </div>

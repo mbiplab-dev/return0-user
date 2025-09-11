@@ -3,7 +3,7 @@
 // File path: src/components/navigation/BottomNavigation.tsx
 // =============================================================================
 
-import { Home, MapPin, Bell, User, Zap, AlertTriangle } from "lucide-react";
+import { Home, MapPin, Bell, User, AlertTriangle } from "lucide-react";
 import type { ActiveTab, SOSState } from "../../types";
 
 interface BottomNavigationProps {

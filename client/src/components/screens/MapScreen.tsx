@@ -41,7 +41,6 @@ const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
       const geojson = await response.json();
       geojsonDataRef.current = geojson;
 
-      // Add polygons
       mapRef.current!.addSource("restricted-areas", {
         type: "geojson",
         data: geojson,
@@ -51,20 +50,14 @@ const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
         id: "restricted-fill",
         type: "fill",
         source: "restricted-areas",
-        paint: {
-          "fill-color": "#f08",
-          "fill-opacity": 0.4,
-        },
+        paint: { "fill-color": "#f08", "fill-opacity": 0.4 },
       });
 
       mapRef.current!.addLayer({
         id: "restricted-outline",
         type: "line",
         source: "restricted-areas",
-        paint: {
-          "line-color": "#000",
-          "line-width": 2,
-        },
+        paint: { "line-color": "#c00", "line-width": 2 },
       });
 
       // ✅ Draggable marker
@@ -72,24 +65,140 @@ const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
         .setLngLat([92.9376, 26.2006])
         .addTo(mapRef.current!);
 
-      markerRef.current.on("dragend", () => {
-        const lngLat = markerRef.current!.getLngLat();
-        const point = turf.point([lngLat.lng, lngLat.lat]);
+      // ✅ Fetch hazards and add as circles
+      const fetchHazards = async () => {
+        try {
+          const [resSachet, resLandslide] = await Promise.all([
+            fetch("http://localhost:5000/api/sachet"),
+            fetch("http://localhost:5000/api/landslide"),
+          ]);
+          const [sachetData, landslideData] = await Promise.all([
+            resSachet.json(),
+            resLandslide.json(),
+          ]);
 
-        let found = false;
-        geojsonDataRef.current.features.forEach((feature: any) => {
-          if (turf.booleanPointInPolygon(point, feature)) {
-             toast.error(
-              `🚨 Marker dropped in restricted area: ${feature.properties.name || "Unnamed"}`
-            );
-            found = true;
-          }
-        });
+          const features: any[] = [];
 
-        if (!found) {
-          toast.success("✅ Marker is in a safe zone");
+          // Sachet alerts → 2km circles
+          sachetData.forEach((a: any) => {
+            if (!a.centroid) return;
+            const [lon, lat] = a.centroid.split(",").map(Number);
+            const circle = turf.circle([lon, lat], 2, {
+              units: "kilometers",
+              steps: 64,
+            });
+            features.push({
+              type: "Feature",
+              geometry: circle.geometry,
+              properties: { ...a, type: "Sachet" },
+            });
+          });
+
+          // Landslides → 2km circles
+          landslideData.forEach((ls: any) => {
+            if (!ls.lat || !ls.lon) return;
+            const circle = turf.circle([ls.lon, ls.lat], 2, {
+              units: "kilometers",
+              steps: 64,
+            });
+            features.push({
+              type: "Feature",
+              geometry: circle.geometry,
+              properties: { ...ls, type: "Landslide" },
+            });
+          });
+
+          const hazardGeojson = { type: "FeatureCollection", features };
+
+          mapRef.current!.addSource("hazards", {
+            type: "geojson",
+            data: hazardGeojson,
+          });
+
+          // Fill layer
+          mapRef.current!.addLayer({
+            id: "hazard-fill",
+            type: "fill",
+            source: "hazards",
+            paint: {
+              "fill-color": [
+                "match",
+                ["get", "type"],
+                "Sachet",
+                "#fbb03b",
+                "Landslide",
+                "#8B4513",
+                "#888",
+              ],
+              "fill-opacity": 0.25,
+            },
+          });
+
+          // Outline layer (same color, darker)
+          mapRef.current!.addLayer({
+            id: "hazard-outline",
+            type: "line",
+            source: "hazards",
+            paint: {
+              "line-color": [
+                "match",
+                ["get", "type"],
+                "Sachet",
+                "#c88617",
+                "Landslide",
+                "#5a2f0e",
+                "#444",
+              ],
+              "line-width": 2,
+            },
+          });
+
+          geojsonDataRef.current.hazards = hazardGeojson;
+        } catch (err) {
+          console.error("Failed to fetch hazards:", err);
         }
-      });
+      };
+
+      await fetchHazards();
+
+      // ✅ Marker dragend handler
+markerRef.current!.on("dragend", () => {
+  const lngLat = markerRef.current!.getLngLat();
+  const point = turf.point([lngLat.lng, lngLat.lat]);
+
+  let isInRestricted = false;
+  const hazardMessages: string[] = [];
+
+  // Check restricted areas
+  geojsonDataRef.current.features.forEach((feature: any) => {
+    if (turf.booleanPointInPolygon(point, feature)) {
+      isInRestricted = true;
+      hazardMessages.push(`🚨 Restricted area: ${feature.properties.name || "Unnamed"}`);
+    }
+  });
+
+  // Check hazard areas
+  if (geojsonDataRef.current.hazards) {
+    geojsonDataRef.current.hazards.features.forEach((feature: any) => {
+      if (turf.booleanPointInPolygon(point, feature)) {
+        const props = feature.properties;
+        if (props.type === "Landslide") {
+          hazardMessages.push(`🚨 Landslide Alert: ${props.state}, ${props.district}, ${props.location}, ${props.status}`);
+        } else {
+          hazardMessages.push(`⚠️ ${props.disaster_type} Alert: ${props.area_description}, Severity: ${props.severity}`);
+        }
+      }
+    });
+  }
+
+  // Display combined alert
+  if (hazardMessages.length > 0) {
+    toast.error(hazardMessages.join("\n"));
+  } else {
+    toast.success("✅ Marker is in a safe zone");
+  }
+});
+
     });
 
     return () => mapRef.current?.remove();
