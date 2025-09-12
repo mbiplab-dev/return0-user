@@ -1,5 +1,5 @@
 // =============================================================================
-// COMPONENT: Add Trip Screen with i18n support
+// COMPONENT: Add Trip Screen with API integration and i18n support
 // File path: src/components/screens/AddTripScreen.tsx
 // =============================================================================
 
@@ -16,26 +16,36 @@ import {
   CreditCard,
   UserPlus,
   Edit3,
-  AlertCircle
+  AlertCircle,
+  Loader
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
 import Header from "../layout/Header";
+import { tripService, useApiState } from "../../services/tripService";
 import type { Trip, TripMember, PhoneNumber, TripItinerary } from "../../types/trip";
 
 interface AddTripScreenProps {
   onBack: () => void;
-  onSaveTrip: (trip: Omit<Trip, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onSaveTrip: (trip: Trip) => void;
+  userId: string; // Add userId prop
 }
 
-const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => {
+const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip, userId }) => {
   const { t } = useTranslation();
+  const { loading, error, executeApiCall, setError } = useApiState();
+  
   const [currentStep, setCurrentStep] = useState<'basic' | 'members' | 'itinerary'>('basic');
+  const [tripId, setTripId] = useState<string | null>(null);
+  
+  // Basic info state
   const [tripName, setTripName] = useState("");
   const [destination, setDestination] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [description, setDescription] = useState("");
+  
+  // Members state
   const [members, setMembers] = useState<TripMember[]>([]);
   const [itinerary, setItinerary] = useState<TripItinerary[]>([]);
   
@@ -56,6 +66,96 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
 
   const generateId = () => Math.random().toString(36).substr(2, 9);
 
+  // Step 1: Create basic trip
+  const handleCreateTrip = async () => {
+    if (!tripName || !destination || !startDate || !endDate) {
+      toast.error(t('trip.fillRequiredFields'));
+      return false;
+    }
+
+    // Validate dates
+    if (new Date(startDate) >= new Date(endDate)) {
+      toast.error(t('trip.invalidDateRange'));
+      return false;
+    }
+
+    const tripData = {
+      tripName,
+      destination,
+      startDate,
+      endDate,
+      description,
+      createdBy: userId
+    };
+
+    const result = await executeApiCall(() => tripService.createTrip(tripData));
+    
+    if (result) {
+      setTripId(result.id);
+      toast.success(t('success.tripCreated'));
+      setCurrentStep('members');
+      return true;
+    } else {
+      toast.error(error || t('error.tripCreationFailed'));
+      return false;
+    }
+  };
+
+  // Step 2: Add members to trip
+  const handleAddMembers = async () => {
+    if (!tripId) {
+      toast.error(t('error.tripNotFound'));
+      return false;
+    }
+
+    if (members.length === 0) {
+      // Allow proceeding without members
+      setCurrentStep('itinerary');
+      return true;
+    }
+
+    const result = await executeApiCall(() => tripService.addMembers(tripId, members));
+    
+    if (result) {
+      toast.success(t('success.membersAdded'));
+      setCurrentStep('itinerary');
+      return true;
+    } else {
+      toast.error(error || t('error.membersAddFailed'));
+      return false;
+    }
+  };
+
+  // Step 3: Add itinerary and complete trip
+  const handleCompleteTrip = async () => {
+    if (!tripId) {
+      toast.error(t('error.tripNotFound'));
+      return;
+    }
+
+    // Add itinerary if any exists
+    if (itinerary.length > 0) {
+      const result = await executeApiCall(() => tripService.addItinerary(tripId, itinerary));
+      
+      if (!result) {
+        toast.error(error || t('error.itineraryAddFailed'));
+        return;
+      }
+    }
+
+    // Fetch the complete trip data
+    const completeTrip = await executeApiCall(() => tripService.getTripById(tripId));
+    
+    if (completeTrip) {
+      toast.success(t('success.tripSaved'));
+      onSaveTrip(completeTrip);
+      onBack();
+    } else {
+      toast.error(error || t('error.tripFetchFailed'));
+    }
+  };
+
+  // Phone number management
   const addPhoneNumber = () => {
     const newPhone: PhoneNumber = {
       id: generateId(),
@@ -84,9 +184,17 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
     });
   };
 
+  // Member management
   const saveMember = () => {
     if (!memberForm.name || !memberForm.documentNumber) {
       toast.error(t('trip.fillRequiredFields'));
+      return;
+    }
+
+    // Validate phone numbers
+    const validPhones = memberForm.phoneNumbers?.filter(phone => phone.number.trim()) || [];
+    if (validPhones.length === 0) {
+      toast.error(t('trip.atLeastOnePhone'));
       return;
     }
 
@@ -96,7 +204,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
       age: memberForm.age || 18,
       documentType: memberForm.documentType!,
       documentNumber: memberForm.documentNumber!,
-      phoneNumbers: memberForm.phoneNumbers!,
+      phoneNumbers: validPhones,
       speciallyAbled: memberForm.speciallyAbled || false,
       specialNeeds: memberForm.specialNeeds,
       emergencyContact: memberForm.emergencyContact,
@@ -143,6 +251,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
     }
   };
 
+  // Itinerary management
   const addItineraryDay = () => {
     const newDay: TripItinerary = {
       id: generateId(),
@@ -192,26 +301,19 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
     ));
   };
 
-  const handleSaveTrip = () => {
-    if (!tripName || !destination || !startDate || !endDate) {
-      toast.error(t('trip.fillRequiredFields'));
-      return;
-    }
-
-    const trip: Omit<Trip, 'id' | 'createdAt' | 'updatedAt'> = {
-      name: tripName,
-      destination,
-      startDate,
-      endDate,
-      description,
-      members,
-      itinerary
-    };
-
-    onSaveTrip(trip);
-    toast.success(t('success.tripSaved'));
-    onBack();
-  };
+  // Error display component
+  const ErrorMessage = ({ message }: { message: string }) => (
+    <div className="mx-4 mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center space-x-2">
+      <AlertCircle size={16} className="text-red-500" />
+      <span className="text-sm text-red-700">{message}</span>
+      <button
+        onClick={() => setError(null)}
+        className="ml-auto text-red-400 hover:text-red-600"
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
 
   const renderStepIndicator = () => (
     <div className="flex items-center justify-center mb-6 px-4">
@@ -223,11 +325,19 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
         ].map((step, index) => (
           <React.Fragment key={step.key}>
             <button
-              onClick={() => setCurrentStep(step.key as any)}
-              className={`flex items-center space-x-2 px-2 rounded-lg text-sm font-medium transition-colors ${
+              onClick={() => {
+                // Only allow going back to completed steps
+                if (step.key === 'basic' || (step.key === 'members' && tripId)) {
+                  setCurrentStep(step.key as any);
+                }
+              }}
+              disabled={step.key === 'members' && !tripId}
+              className={`flex items-center space-x-2 px-2 py-1 rounded-lg text-sm font-medium transition-colors ${
                 currentStep === step.key
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : tripId || step.key === 'basic'
+                  ? 'bg-gray-100 text-gray-600 hover:bg-gray-200 cursor-pointer'
+                  : 'bg-gray-50 text-gray-400 cursor-not-allowed'
               }`}
             >
               <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
@@ -261,7 +371,8 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
               value={tripName}
               onChange={(e) => setTripName(e.target.value)}
               placeholder={t('trip.tripNamePlaceholder')}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={loading}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
             />
           </div>
 
@@ -274,7 +385,8 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
               placeholder={t('trip.destinationPlaceholder')}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={loading}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
             />
           </div>
 
@@ -287,7 +399,9 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min={new Date().toISOString().split('T')[0]}
+                disabled={loading}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
               />
             </div>
             <div>
@@ -298,7 +412,9 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min={startDate || new Date().toISOString().split('T')[0]}
+                disabled={loading}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
               />
             </div>
           </div>
@@ -312,16 +428,19 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t('trip.descriptionPlaceholder')}
               rows={3}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              disabled={loading}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:bg-gray-50 disabled:text-gray-500"
             />
           </div>
         </div>
 
         <button
-          onClick={() => setCurrentStep('members')}
-          className="w-full mt-6 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors"
+          onClick={handleCreateTrip}
+          disabled={loading}
+          className="w-full mt-6 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
         >
-          {t('trip.continueToMembers')}
+          {loading && <Loader size={16} className="animate-spin" />}
+          <span>{loading ? t('common.saving') : t('trip.continueToMembers')}</span>
         </button>
       </div>
     </div>
@@ -337,7 +456,8 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
           </h3>
           <button
             onClick={() => setShowAddMember(true)}
-            className="flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-purple-700 transition-colors"
+            disabled={loading}
+            className="flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-purple-700 transition-colors disabled:bg-purple-400 disabled:cursor-not-allowed"
           >
             <UserPlus size={16} />
             <span>{t('trip.addMember')}</span>
@@ -368,13 +488,15 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                   <div className="flex space-x-2">
                     <button
                       onClick={() => editMember(member)}
-                      className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                      disabled={loading}
+                      className="p-2 text-gray-400 hover:text-blue-600 transition-colors disabled:text-gray-300"
                     >
                       <Edit3 size={16} />
                     </button>
                     <button
                       onClick={() => removeMember(member.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                      disabled={loading}
+                      className="p-2 text-gray-400 hover:text-red-600 transition-colors disabled:text-gray-300"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -388,15 +510,18 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
         <div className="flex space-x-3 mt-6">
           <button
             onClick={() => setCurrentStep('basic')}
-            className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+            disabled={loading}
+            className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
           >
             {t('common.back')}
           </button>
           <button
-            onClick={() => setCurrentStep('itinerary')}
-            className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors"
+            onClick={handleAddMembers}
+            disabled={loading}
+            className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
           >
-            {t('trip.continueToItinerary')}
+            {loading && <Loader size={16} className="animate-spin" />}
+            <span>{loading ? t('common.saving') : t('trip.continueToItinerary')}</span>
           </button>
         </div>
       </div>
@@ -588,13 +713,14 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
     );
   };
 
-const renderItinerary = () => (
+  const renderItinerary = () => (
     <div className="p-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-900">{t('trip.tripItinerary')}</h3>
         <button
           onClick={addItineraryDay}
-          className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center space-x-2"
+          disabled={loading}
+          className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-green-400 disabled:cursor-not-allowed"
         >
           <Plus size={16} />
           <span>{t('trip.addDay')}</span>
@@ -616,7 +742,8 @@ const renderItinerary = () => (
                   <h4 className="font-medium text-gray-900">{t('trip.day')} {index + 1}</h4>
                   <button
                     onClick={() => removeItineraryDay(day.id)}
-                    className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                    disabled={loading}
+                    className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:text-gray-300"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -628,14 +755,18 @@ const renderItinerary = () => (
                       type="date"
                       value={day.date}
                       onChange={(e) => updateItinerary(day.id, 'date', e.target.value)}
-                      className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                      min={startDate}
+                      max={endDate}
+                      disabled={loading}
+                      className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm disabled:bg-gray-50"
                     />
                     <input
                       type="text"
                       value={day.location}
                       onChange={(e) => updateItinerary(day.id, 'location', e.target.value)}
                       placeholder={t('common.location')}
-                      className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                      disabled={loading}
+                      className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm disabled:bg-gray-50"
                     />
                   </div>
 
@@ -644,7 +775,8 @@ const renderItinerary = () => (
                       <label className="text-sm font-medium text-gray-700">{t('trip.activities')}</label>
                       <button
                         onClick={() => addActivity(day.id)}
-                        className="text-green-600 hover:text-green-700 text-sm font-medium"
+                        disabled={loading}
+                        className="text-green-600 hover:text-green-700 text-sm font-medium disabled:text-green-400"
                       >
                         {t('trip.addActivity')}
                       </button>
@@ -657,12 +789,14 @@ const renderItinerary = () => (
                             value={activity}
                             onChange={(e) => updateActivity(day.id, activityIndex, e.target.value)}
                             placeholder={t('trip.activityPlaceholder')}
-                            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                            disabled={loading}
+                            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm disabled:bg-gray-50"
                           />
                           {day.activities.length > 1 && (
                             <button
                               onClick={() => removeActivity(day.id, activityIndex)}
-                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              disabled={loading}
+                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:text-red-300"
                             >
                               <X size={16} />
                             </button>
@@ -677,7 +811,8 @@ const renderItinerary = () => (
                     onChange={(e) => updateItinerary(day.id, 'notes', e.target.value)}
                     placeholder={t('trip.additionalNotes')}
                     rows={2}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none text-sm"
+                    disabled={loading}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none text-sm disabled:bg-gray-50"
                   />
                 </div>
               </div>
@@ -688,16 +823,19 @@ const renderItinerary = () => (
         <div className="flex space-x-3 mt-6">
           <button
             onClick={() => setCurrentStep('members')}
-            className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+            disabled={loading}
+            className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
           >
             {t('common.back')}
           </button>
           <button
-            onClick={handleSaveTrip}
-            className="flex-1 bg-green-600 text-white py-3 rounded-xl font-medium hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+            onClick={handleCompleteTrip}
+            disabled={loading}
+            className="flex-1 bg-green-600 text-white py-3 rounded-xl font-medium hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
           >
+            {loading && <Loader size={16} className="animate-spin" />}
             <Save size={16} />
-            <span>{t('trip.saveTrip')}</span>
+            <span>{loading ? t('common.saving') : t('trip.saveTrip')}</span>
           </button>
         </div>
       </div>
@@ -711,16 +849,21 @@ const renderItinerary = () => (
         showBack
         onBack={onBack}
         rightAction={
-          <button
-            onClick={handleSaveTrip}
-            className="text-sm text-blue-600 font-medium"
-          >
-            {t('common.save')}
-          </button>
+          currentStep === 'itinerary' ? (
+            <button
+              onClick={handleCompleteTrip}
+              disabled={loading}
+              className="text-sm text-blue-600 font-medium disabled:text-blue-400"
+            >
+              {loading ? t('common.saving') : t('common.save')}
+            </button>
+          ) : null
         }
       />
 
       {renderStepIndicator()}
+
+      {error && <ErrorMessage message={error} />}
 
       <div className="pb-6">
         {currentStep === 'basic' && renderBasicInfo()}
