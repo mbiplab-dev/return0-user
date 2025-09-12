@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-
+import "./i18n";
 // Auth Components
 import LoginScreen from "./components/auth/LoginScreen";
 import SignupScreen from "./components/auth/SignupScreen";
@@ -20,6 +25,8 @@ import SOSInterface from "./components/sos/SosInterface";
 // Types
 import type { ActiveTab, SOSState, GroupMember, Notification } from "./types";
 import type { Trip } from "./types/trip";
+import { useTranslation } from "react-i18next";
+import { supportedLanguages } from "./i18n/languages";
 
 // Mapbox access token
 mapboxgl.accessToken = import.meta.env.VITE_REACT_APP_MAPBOX_TOKEN;
@@ -30,16 +37,25 @@ mapboxgl.accessToken = import.meta.env.VITE_REACT_APP_MAPBOX_TOKEN;
 // =============================================================================
 
 const SmartTouristApp: React.FC = () => {
+  const { i18n } = useTranslation();
+
+  useEffect(() => {
+    const currentLang = supportedLanguages.find(
+      (lang) => lang.code === i18n.language
+    );
+    document.documentElement.dir = currentLang?.rtl ? "rtl" : "ltr";
+    document.documentElement.lang = i18n.language;
+  }, [i18n.language]);
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  
+
   // State management
   const [activeTab, setActiveTab] = useState<ActiveTab>("home");
   const [sosState, setSosState] = useState<SOSState>("inactive");
   const [swipeProgress, setSwipeProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartX, setDragStartX] = useState(0);
-  
+
   // App data
   const [currentLocation] = useState("Dubai Marina, UAE");
   const [safetyScore] = useState(85);
@@ -134,15 +150,17 @@ const SmartTouristApp: React.FC = () => {
   };
 
   // Trip management functions
-  const handleSaveTrip = (tripData: Omit<Trip, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const handleSaveTrip = (
+    tripData: Omit<Trip, "id" | "createdAt" | "updatedAt">
+  ) => {
     const newTrip: Trip = {
       ...tripData,
       id: Math.random().toString(36).substr(2, 9),
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
-    setTrips(prev => [...prev, newTrip]);
-    console.log('Trip saved:', newTrip);
+    setTrips((prev) => [...prev, newTrip]);
+    console.log("Trip saved:", newTrip);
   };
 
   const handleAddTripPress = () => {
@@ -155,7 +173,13 @@ const SmartTouristApp: React.FC = () => {
 
   // Map initialization
   useEffect(() => {
-    if (!isAuthenticated || activeTab !== "map" || !mapContainer.current || mapRef.current) return;
+    if (
+      !isAuthenticated ||
+      activeTab !== "map" ||
+      !mapContainer.current ||
+      mapRef.current
+    )
+      return;
 
     mapRef.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -249,6 +273,8 @@ const SmartTouristApp: React.FC = () => {
   const handleSOSPress = () => {
     if (activeTab !== "SOS") {
       setActiveTab("SOS");
+      setSosState("swipe");
+      setSwipeProgress(0);
     } else {
       setSosState("swipe");
       setSwipeProgress(0);
@@ -348,7 +374,10 @@ const SmartTouristApp: React.FC = () => {
           );
         case "map":
           return (
-            <MapScreen groupMembers={groupMembers} mapContainer={mapContainer} />
+            <MapScreen
+              groupMembers={groupMembers}
+              mapContainer={mapContainer}
+            />
           );
         case "notifications":
           return <NotificationScreen notifications={notifications} />;
@@ -356,7 +385,7 @@ const SmartTouristApp: React.FC = () => {
           return <ProfileScreen />;
         case "addTrip":
           return (
-            <AddTripScreen 
+            <AddTripScreen
               onBack={handleBackFromAddTrip}
               onSaveTrip={handleSaveTrip}
             />
@@ -402,21 +431,21 @@ const SmartTouristApp: React.FC = () => {
           toastOptions={{
             duration: 4000,
             style: {
-              background: '#363636',
-              color: '#fff',
+              background: "#363636",
+              color: "#fff",
             },
             success: {
               duration: 3000,
               iconTheme: {
-                primary: '#4ade80',
-                secondary: '#fff',
+                primary: "#4ade80",
+                secondary: "#fff",
               },
             },
             error: {
               duration: 4000,
               iconTheme: {
-                primary: '#ef4444',
-                secondary: '#fff',
+                primary: "#ef4444",
+                secondary: "#fff",
               },
             },
           }}
@@ -424,53 +453,49 @@ const SmartTouristApp: React.FC = () => {
 
         <Routes>
           {/* Authentication Routes */}
-          <Route 
-            path="/login" 
+          <Route
+            path="/login"
             element={
               !isAuthenticated ? (
                 <LoginScreen onAuthSuccess={handleAuthSuccess} />
               ) : (
                 <Navigate to="/app" replace />
               )
-            } 
+            }
           />
-          <Route 
-            path="/signup" 
+          <Route
+            path="/signup"
             element={
               !isAuthenticated ? (
                 <SignupScreen onAuthSuccess={handleAuthSuccess} />
               ) : (
                 <Navigate to="/app" replace />
               )
-            } 
+            }
           />
 
           {/* Main App Route */}
-          <Route 
-            path="/app" 
+          <Route
+            path="/app"
             element={
-              isAuthenticated ? (
-                <MainApp />
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            } 
+              isAuthenticated ? <MainApp /> : <Navigate to="/login" replace />
+            }
           />
 
           {/* Default Route */}
-          <Route 
-            path="/" 
+          <Route
+            path="/"
             element={
               <Navigate to={isAuthenticated ? "/app" : "/login"} replace />
-            } 
+            }
           />
 
           {/* Catch all route */}
-          <Route 
-            path="*" 
+          <Route
+            path="*"
             element={
               <Navigate to={isAuthenticated ? "/app" : "/login"} replace />
-            } 
+            }
           />
         </Routes>
       </div>
