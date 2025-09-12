@@ -20,13 +20,14 @@ import MapScreen from "./components/screens/MapScreen";
 import NotificationScreen from "./components/screens/NotificationScreen";
 import ProfileScreen from "./components/screens/ProfileScreen";
 import AddTripScreen from "./components/screens/AddTripScreen";
-import SOSInterface from "./components/sos/SosInterface";
+import SOSInterface from "./components/sos/SOSInterface";
 
 // Types
 import type { ActiveTab, SOSState, GroupMember, Notification } from "./types";
 import type { Trip } from "./types/trip";
 import { useTranslation } from "react-i18next";
 import { supportedLanguages } from "./i18n/languages";
+import PhoneFrame from "./components/layout/PhoneFrame";
 
 // Mapbox access token
 mapboxgl.accessToken = import.meta.env.VITE_REACT_APP_MAPBOX_TOKEN;
@@ -407,23 +408,35 @@ const SmartTouristApp: React.FC = () => {
     };
 
     return (
-      <div className="max-w-sm mx-auto bg-gray-50 min-h-screen relative">
-        <div className="pb-20">{renderScreen()}</div>
-        <BottomNavigation
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          onSOSPress={handleSOSPress}
-          notificationCount={
-            notifications.filter((n) => n.priority === "high").length
-          }
-          sosState={sosState}
-        />
-      </div>
+      
+      <div className="max-w-sm mx-auto bg-gray-50 min-h-screen flex flex-col">
+  {/* Scrollable screen */}
+  <div className="flex-1 overflow-y-auto pb-16">
+    {renderScreen()}
+  </div>
+
+  {/* Sticky bottom nav inside the container */}
+  <div className="sticky bottom-0 w-full">
+    <BottomNavigation
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      onSOSPress={handleSOSPress}
+      notificationCount={
+        notifications.filter((n) => n.priority === "high").length
+      }
+      sosState={sosState}
+    />
+  </div>
+</div>
+
     );
   };
 
   return (
+    <div>
+    <PhoneFrame>
     <Router>
+      
       <div className="App">
         {/* Toast Notifications */}
         <Toaster
@@ -499,7 +512,10 @@ const SmartTouristApp: React.FC = () => {
           />
         </Routes>
       </div>
+      
     </Router>
+    </PhoneFrame>
+    </div>
   );
 };
 

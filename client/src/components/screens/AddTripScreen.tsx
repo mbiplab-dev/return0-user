@@ -1,5 +1,5 @@
 // =============================================================================
-// COMPONENT: Add Trip Screen
+// COMPONENT: Add Trip Screen with i18n support
 // File path: src/components/screens/AddTripScreen.tsx
 // =============================================================================
 
@@ -18,6 +18,8 @@ import {
   Edit3,
   AlertCircle
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { toast } from "react-hot-toast";
 import Header from "../layout/Header";
 import type { Trip, TripMember, PhoneNumber, TripItinerary } from "../../types/trip";
 
@@ -27,6 +29,7 @@ interface AddTripScreenProps {
 }
 
 const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => {
+  const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState<'basic' | 'members' | 'itinerary'>('basic');
   const [tripName, setTripName] = useState("");
   const [destination, setDestination] = useState("");
@@ -83,7 +86,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
 
   const saveMember = () => {
     if (!memberForm.name || !memberForm.documentNumber) {
-      alert("Please fill in required fields");
+      toast.error(t('trip.fillRequiredFields'));
       return;
     }
 
@@ -102,8 +105,10 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
 
     if (editingMember) {
       setMembers(members.map(m => m.id === editingMember.id ? newMember : m));
+      toast.success(t('success.memberUpdated'));
     } else {
       setMembers([...members, newMember]);
+      toast.success(t('success.memberAdded'));
     }
 
     resetMemberForm();
@@ -132,7 +137,10 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
   };
 
   const removeMember = (id: string) => {
-    setMembers(members.filter(m => m.id !== id));
+    if (confirm(t('trip.deleteConfirm'))) {
+      setMembers(members.filter(m => m.id !== id));
+      toast.success(t('success.memberDeleted'));
+    }
   };
 
   const addItineraryDay = () => {
@@ -153,7 +161,9 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
   };
 
   const removeItineraryDay = (id: string) => {
-    setItinerary(itinerary.filter(day => day.id !== id));
+    if (confirm(t('trip.deleteDay'))) {
+      setItinerary(itinerary.filter(day => day.id !== id));
+    }
   };
 
   const addActivity = (dayId: string) => {
@@ -184,7 +194,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
 
   const handleSaveTrip = () => {
     if (!tripName || !destination || !startDate || !endDate) {
-      alert("Please fill in all required trip details");
+      toast.error(t('trip.fillRequiredFields'));
       return;
     }
 
@@ -199,6 +209,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
     };
 
     onSaveTrip(trip);
+    toast.success(t('success.tripSaved'));
     onBack();
   };
 
@@ -206,9 +217,9 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
     <div className="flex items-center justify-center mb-6 px-4">
       <div className="flex items-center space-x-2 pt-2 px-2">
         {[
-          { key: 'basic', label: 'Trip Info' },
-          { key: 'members', label: 'Add Members' },
-          { key: 'itinerary', label: 'Add Itinerary' }
+          { key: 'basic', labelKey: 'trip.stepIndicator.step1' },
+          { key: 'members', labelKey: 'trip.stepIndicator.step2' },
+          { key: 'itinerary', labelKey: 'trip.stepIndicator.step3' }
         ].map((step, index) => (
           <React.Fragment key={step.key}>
             <button
@@ -224,7 +235,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
               }`}>
                 {index + 1}
               </span>
-              <span>{step.label}</span>
+              <span>{t(step.labelKey)}</span>
             </button>
             {index < 2 && <div className="w-8 h-px bg-gray-300" />}
           </React.Fragment>
@@ -238,31 +249,31 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
       <div className="bg-white rounded-2xl p-6 border border-gray-100">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
           <MapPin className="mr-2 text-blue-600" size={20} />
-          Trip Details
+          {t('trip.tripDetails')}
         </h3>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Trip Name *
+              {t('trip.tripName')} *
             </label>
             <input
               type="text"
               value={tripName}
               onChange={(e) => setTripName(e.target.value)}
-              placeholder="e.g., Dubai Adventure 2024"
+              placeholder={t('trip.tripNamePlaceholder')}
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Destination *
+              {t('trip.destination')} *
             </label>
             <input
               type="text"
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
-              placeholder="e.g., Dubai, UAE"
+              placeholder={t('trip.destinationPlaceholder')}
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -270,7 +281,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Start Date *
+                {t('trip.startDate')} *
               </label>
               <input
                 type="date"
@@ -281,7 +292,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                End Date *
+                {t('trip.endDate')} *
               </label>
               <input
                 type="date"
@@ -294,12 +305,12 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
+              {t('trip.description')}
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Brief description of your trip..."
+              placeholder={t('trip.descriptionPlaceholder')}
               rows={3}
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
@@ -310,7 +321,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
           onClick={() => setCurrentStep('members')}
           className="w-full mt-6 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors"
         >
-          Continue to Members
+          {t('trip.continueToMembers')}
         </button>
       </div>
     </div>
@@ -322,22 +333,22 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900 flex items-center">
             <Users className="mr-2 text-purple-600" size={20} />
-            Trip Members ({members.length})
+            {t('trip.tripMembers')} ({t('trip.memberCount', { count: members.length })})
           </h3>
           <button
             onClick={() => setShowAddMember(true)}
             className="flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-purple-700 transition-colors"
           >
             <UserPlus size={16} />
-            <span>Add Member</span>
+            <span>{t('trip.addMember')}</span>
           </button>
         </div>
 
         {members.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Users size={48} className="mx-auto mb-2 text-gray-300" />
-            <p>No members added yet</p>
-            <p className="text-sm">Add travelers to your trip</p>
+            <p>{t('trip.noMembersYet')}</p>
+            <p className="text-sm">{t('trip.addTravelers')}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -347,11 +358,11 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                   <div className="flex-1">
                     <h4 className="font-medium text-gray-900">{member.name}</h4>
                     <p className="text-sm text-gray-600">
-                      Age: {member.age} • {member.documentType.toUpperCase()}: {member.documentNumber}
+                      {t('trip.age')}: {member.age} • {member.documentType.toUpperCase()}: {member.documentNumber}
                     </p>
                     <p className="text-sm text-gray-500">
-                      {member.phoneNumbers.length} phone number(s)
-                      {member.speciallyAbled && " • Specially Abled"}
+                      {member.phoneNumbers.length} {t('trip.phoneNumbers').toLowerCase()}
+                      {member.speciallyAbled && ` • ${t('trip.speciallyAbled')}`}
                     </p>
                   </div>
                   <div className="flex space-x-2">
@@ -379,13 +390,13 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
             onClick={() => setCurrentStep('basic')}
             className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors"
           >
-            Back
+            {t('common.back')}
           </button>
           <button
             onClick={() => setCurrentStep('itinerary')}
             className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors"
           >
-            Continue to Itinerary
+            {t('trip.continueToItinerary')}
           </button>
         </div>
       </div>
@@ -396,12 +407,12 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
     if (!showAddMember) return null;
 
     return (
-      <div className="absolute inset-0 bg-opacity-50 z-50 flex items-end justify-center">
+      <div className="absolute inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-center">
         <div className="bg-white rounded-t-3xl w-full max-w-sm h-full overflow-y-auto">
           <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">
-                {editingMember ? 'Edit Member' : 'Add Member'}
+                {editingMember ? t('trip.editMember') : t('trip.addMember')}
               </h3>
               <button
                 onClick={resetMemberForm}
@@ -415,20 +426,20 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
           <div className="p-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name *
+                {t('trip.fullName')} *
               </label>
               <input
                 type="text"
                 value={memberForm.name || ""}
                 onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })}
-                placeholder="Enter full name"
+                placeholder={t('trip.fullNamePlaceholder')}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Age *
+                {t('trip.age')} *
               </label>
               <input
                 type="number"
@@ -442,27 +453,27 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Document Type *
+                {t('trip.documentType')} *
               </label>
               <select
                 value={memberForm.documentType || "aadhar"}
                 onChange={(e) => setMemberForm({ ...memberForm, documentType: e.target.value as 'aadhar' | 'passport' })}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
-                <option value="aadhar">Aadhar Card</option>
-                <option value="passport">Passport</option>
+                <option value="aadhar">{t('trip.aadharCard')}</option>
+                <option value="passport">{t('trip.passport')}</option>
               </select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Document Number *
+                {t('trip.documentNumber')} *
               </label>
               <input
                 type="text"
                 value={memberForm.documentNumber || ""}
                 onChange={(e) => setMemberForm({ ...memberForm, documentNumber: e.target.value })}
-                placeholder={memberForm.documentType === 'aadhar' ? 'Enter Aadhar number' : 'Enter Passport number'}
+                placeholder={memberForm.documentType === 'aadhar' ? t('trip.aadharPlaceholder') : t('trip.passportPlaceholder')}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
@@ -470,14 +481,14 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-medium text-gray-700">
-                  Phone Numbers *
+                  {t('trip.phoneNumbers')} *
                 </label>
                 <button
                   onClick={addPhoneNumber}
                   className="text-purple-600 hover:text-purple-700 text-sm font-medium flex items-center"
                 >
                   <Plus size={16} className="mr-1" />
-                  Add Phone
+                  {t('trip.addPhone')}
                 </button>
               </div>
               <div className="space-y-2">
@@ -487,7 +498,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                       type="tel"
                       value={phone.number}
                       onChange={(e) => updatePhoneNumber(phone.id, 'number', e.target.value)}
-                      placeholder="Phone number"
+                      placeholder={t('common.phone')}
                       className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                     />
                     <select
@@ -495,9 +506,9 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                       onChange={(e) => updatePhoneNumber(phone.id, 'type', e.target.value)}
                       className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                     >
-                      <option value="primary">Primary</option>
-                      <option value="emergency">Emergency</option>
-                      <option value="other">Other</option>
+                      <option value="primary">{t('trip.phoneType.primary')}</option>
+                      <option value="emergency">{t('trip.phoneType.emergency')}</option>
+                      <option value="other">{t('trip.phoneType.other')}</option>
                     </select>
                     {memberForm.phoneNumbers!.length > 1 && (
                       <button
@@ -520,19 +531,19 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                   onChange={(e) => setMemberForm({ ...memberForm, speciallyAbled: e.target.checked })}
                   className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                 />
-                <span className="text-sm font-medium text-gray-700">Specially Abled</span>
+                <span className="text-sm font-medium text-gray-700">{t('trip.speciallyAbled')}</span>
               </label>
             </div>
 
             {memberForm.speciallyAbled && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Special Needs/Requirements
+                  {t('trip.specialNeeds')}
                 </label>
                 <textarea
                   value={memberForm.specialNeeds || ""}
                   onChange={(e) => setMemberForm({ ...memberForm, specialNeeds: e.target.value })}
-                  placeholder="Describe any special needs or requirements..."
+                  placeholder={t('trip.specialNeedsPlaceholder')}
                   rows={2}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
                 />
@@ -541,26 +552,26 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Emergency Contact
+                {t('trip.emergencyContactName')}
               </label>
               <input
                 type="text"
                 value={memberForm.emergencyContact || ""}
                 onChange={(e) => setMemberForm({ ...memberForm, emergencyContact: e.target.value })}
-                placeholder="Emergency contact name and phone"
+                placeholder={t('trip.emergencyContactPlaceholder')}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Relationship
+                {t('trip.relationship')}
               </label>
               <input
                 type="text"
                 value={memberForm.relation || ""}
                 onChange={(e) => setMemberForm({ ...memberForm, relation: e.target.value })}
-                placeholder="e.g., Spouse, Child, Friend"
+                placeholder={t('trip.relationshipPlaceholder')}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
@@ -569,7 +580,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
               onClick={saveMember}
               className="w-full bg-purple-600 text-white py-3 rounded-xl font-medium hover:bg-purple-700 transition-colors mt-6"
             >
-              {editingMember ? 'Update Member' : 'Add Member'}
+              {editingMember ? t('trip.updateMember') : t('trip.addMember')}
             </button>
           </div>
         </div>
@@ -577,35 +588,32 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
     );
   };
 
-  const renderItinerary = () => (
-    <div className="px-4 space-y-4">
-      <div className="bg-white rounded-2xl p-6 border border-gray-100">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-            <Calendar className="mr-2 text-green-600" size={20} />
-            Trip Itinerary ({itinerary.length} days)
-          </h3>
-          <button
-            onClick={addItineraryDay}
-            className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors"
-          >
-            <Plus size={16} />
-            <span>Add Day</span>
-          </button>
-        </div>
+const renderItinerary = () => (
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-900">{t('trip.tripItinerary')}</h3>
+        <button
+          onClick={addItineraryDay}
+          className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center space-x-2"
+        >
+          <Plus size={16} />
+          <span>{t('trip.addDay')}</span>
+        </button>
+      </div>
 
+      <div className="mb-6">
         {itinerary.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <Calendar size={48} className="mx-auto mb-2 text-gray-300" />
-            <p>No itinerary added yet</p>
-            <p className="text-sm">Plan your daily activities</p>
+          <div className="text-center py-8">
+            <Calendar className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+            <h3 className="text-sm font-medium text-gray-900 mb-1">{t('trip.noItineraryYet')}</h3>
+            <p className="text-sm text-gray-500">{t('trip.planDailyActivities')}</p>
           </div>
         ) : (
           <div className="space-y-4">
             {itinerary.map((day, index) => (
               <div key={day.id} className="border border-gray-100 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium text-gray-900">Day {index + 1}</h4>
+                  <h4 className="font-medium text-gray-900">{t('trip.day')} {index + 1}</h4>
                   <button
                     onClick={() => removeItineraryDay(day.id)}
                     className="p-1 text-gray-400 hover:text-red-600 transition-colors"
@@ -626,19 +634,19 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                       type="text"
                       value={day.location}
                       onChange={(e) => updateItinerary(day.id, 'location', e.target.value)}
-                      placeholder="Location"
+                      placeholder={t('common.location')}
                       className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
                     />
                   </div>
 
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-gray-700">Activities</label>
+                      <label className="text-sm font-medium text-gray-700">{t('trip.activities')}</label>
                       <button
                         onClick={() => addActivity(day.id)}
                         className="text-green-600 hover:text-green-700 text-sm font-medium"
                       >
-                        + Add Activity
+                        {t('trip.addActivity')}
                       </button>
                     </div>
                     <div className="space-y-2">
@@ -648,7 +656,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                             type="text"
                             value={activity}
                             onChange={(e) => updateActivity(day.id, activityIndex, e.target.value)}
-                            placeholder="Activity description"
+                            placeholder={t('trip.activityPlaceholder')}
                             className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
                           />
                           {day.activities.length > 1 && (
@@ -667,7 +675,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                   <textarea
                     value={day.notes || ""}
                     onChange={(e) => updateItinerary(day.id, 'notes', e.target.value)}
-                    placeholder="Additional notes for this day..."
+                    placeholder={t('trip.additionalNotes')}
                     rows={2}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none text-sm"
                   />
@@ -682,14 +690,14 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
             onClick={() => setCurrentStep('members')}
             className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors"
           >
-            Back
+            {t('common.back')}
           </button>
           <button
             onClick={handleSaveTrip}
             className="flex-1 bg-green-600 text-white py-3 rounded-xl font-medium hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
           >
             <Save size={16} />
-            <span>Save Trip</span>
+            <span>{t('trip.saveTrip')}</span>
           </button>
         </div>
       </div>
@@ -699,7 +707,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
   return (
     <div className="h-full bg-gray-50">
       <Header
-        title="Add New Trip"
+        title={t('trip.addNewTrip')}
         showBack
         onBack={onBack}
         rightAction={
@@ -707,7 +715,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
             onClick={handleSaveTrip}
             className="text-sm text-blue-600 font-medium"
           >
-            Save
+            {t('common.save')}
           </button>
         }
       />

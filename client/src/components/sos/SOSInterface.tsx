@@ -1,18 +1,6 @@
-// =============================================================================
-// COMPONENT: SOS Interface with i18n support
-// File path: src/components/sos/SOSInterface.tsx
-// =============================================================================
-
-import {
-  Zap,
-  MapPin,
-  Phone,
-  Users,
-  CheckCircle,
-  ArrowRight,
-} from "lucide-react";
-import { useTranslation } from "../../hooks/useTranslation";
+import { Zap, MapPin, Phone, Users, CheckCircle, ArrowRight } from "lucide-react";
 import type { SOSState } from "../../types";
+import { useTranslation } from "react-i18next";
 
 interface SOSInterfaceProps {
   sosState: SOSState;
@@ -31,18 +19,16 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
   onClose,
   sosMapContainer,
 }) => {
-  const { t, isRTL } = useTranslation();
+  const { t } = useTranslation();
 
   if (sosState === "inactive") return null;
 
   return (
-    <div className={`h-full w-full bg-gray-50 flex flex-col ${isRTL ? 'rtl' : 'ltr'}`}>
+    <div className="h-full w-full bg-gray-50 flex flex-col">
       {/* Header */}
       <div className="px-4 py-4 bg-white border-b border-gray-200">
-        <div className={`flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <h1 className="text-lg font-bold text-gray-900">
-            {t('sos.emergencySOS')}
-          </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-bold text-gray-900">{t('sos.emergencySOS')}</h1>
           <button
             onClick={onClose}
             className="px-3 py-1.5 bg-gray-100 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors"
@@ -72,11 +58,11 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
 
             {/* Info Cards */}
             <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-              <div className={`flex items-center space-x-3 ${isRTL ? 'space-x-reverse' : ''}`}>
+              <div className="flex items-center space-x-3">
                 <div className="p-2 bg-blue-50 rounded-lg">
                   <MapPin size={20} className="text-blue-600" />
                 </div>
-                <div className={isRTL ? 'text-right' : 'text-left'}>
+                <div>
                   <h3 className="font-semibold text-gray-900">
                     {t('sos.currentLocation')}
                   </h3>
@@ -86,11 +72,11 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
             </div>
 
             <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-              <div className={`flex items-center space-x-3 ${isRTL ? 'space-x-reverse' : ''}`}>
+              <div className="flex items-center space-x-3">
                 <div className="p-2 bg-green-50 rounded-lg">
                   <Phone size={20} className="text-green-600" />
                 </div>
-                <div className={isRTL ? 'text-right' : 'text-left'}>
+                <div>
                   <h3 className="font-semibold text-gray-900">
                     {t('sos.emergencyServices')}
                   </h3>
@@ -102,17 +88,14 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
             </div>
 
             <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-              <div className={`flex items-center space-x-3 ${isRTL ? 'space-x-reverse' : ''}`}>
+              <div className="flex items-center space-x-3">
                 <div className="p-2 bg-purple-50 rounded-lg">
                   <Users size={20} className="text-purple-600" />
                 </div>
-                <div className={isRTL ? 'text-right' : 'text-left'}>
+                <div>
                   <h3 className="font-semibold text-gray-900">
-                    {t('notifications.emergencyContacts')}
-                  </h3>
-                  <p className="text-sm text-gray-600">
                     {t('sos.contactsNotified', { count: 4 })}
-                  </p>
+                  </h3>
                 </div>
               </div>
             </div>
@@ -120,6 +103,7 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
             {/* Swipe Control */}
             <div className="bg-white rounded-2xl p-4 shadow-sm">
               <div className="relative h-16 bg-red-600 rounded-full flex items-center px-2 overflow-hidden">
+
                 {/* Slider button */}
                 <div
                   className="relative z-10 w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg cursor-pointer transition-transform duration-150 ease-out"
@@ -135,17 +119,14 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
                   {swipeProgress > 80 ? (
                     <CheckCircle className="text-red-600" size={24} />
                   ) : (
-                    <ArrowRight 
-                      className={`text-red-600 ${isRTL ? 'rotate-180' : ''}`} 
-                      size={24} 
-                    />
+                    <ArrowRight className="text-red-600" size={24} />
                   )}
                 </div>
 
                 {/* Text overlay */}
                 {swipeProgress < 50 && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                    <span className={`text-white font-medium text-sm ${isRTL ? 'mr-8' : 'ml-8'}`}>
+                    <span className="text-white font-medium text-sm ml-8">
                       {t('sos.slideToSendSOS')}
                     </span>
                   </div>
@@ -194,10 +175,10 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
         {sosState === "waiting" && (
           <>
             <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-              <h3 className={`font-semibold text-gray-900 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+              <h3 className="font-semibold text-gray-900 mb-2">
                 {t('sos.emergencyActive')}
               </h3>
-              <p className={`text-sm text-gray-600 ${isRTL ? 'text-right' : 'text-left'}`}>
+              <p className="text-sm text-gray-600">
                 {t('sos.trackResponders')}
               </p>
             </div>
@@ -214,31 +195,25 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
                     {t('sos.police')}
                   </span>
                 </div>
-                <p className="text-xs text-gray-600">
-                  {t('sos.minAway', { minutes: 6 })}
-                </p>
+                <p className="text-xs text-gray-600">6 {t('sos.minAway')}</p>
               </div>
               <div>
                 <div className="flex items-center justify-center space-x-1 mb-1">
                   <div className="w-2 h-2 bg-green-500 rounded-full" />
                   <span className="text-sm font-medium text-gray-900">
-                    {t('notifications.medical')}
+                    {t('sos.medical')}
                   </span>
                 </div>
-                <p className="text-xs text-gray-600">
-                  {t('sos.minAway', { minutes: 8 })}
-                </p>
+                <p className="text-xs text-gray-600">8 {t('sos.minAway')}</p>
               </div>
               <div>
                 <div className="flex items-center justify-center space-x-1 mb-1">
                   <div className="w-2 h-2 bg-purple-500 rounded-full" />
                   <span className="text-sm font-medium text-gray-900">
-                    {t('notifications.emergencyContacts')}
+                    {t('sos.contacts')}
                   </span>
                 </div>
-                <p className="text-xs text-gray-600">
-                  {t('sos.notified')}
-                </p>
+                <p className="text-xs text-gray-600">{t('sos.notified')}</p>
               </div>
             </div>
           </>
