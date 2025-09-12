@@ -23,7 +23,7 @@ export const supportedLanguages: Language[] = [
   { code: 'pa', name: 'Punjabi', nativeName: 'ਪੰਜਾਬੀ', flag: 'PA' },
   { code: 'ta', name: 'Tamil', nativeName: 'தமிழ்', flag: 'TA' },
   { code: 'te', name: 'Telugu', nativeName: 'తెలుగు', flag: 'TE' },
-  { code: 'ur', name: 'Urdu', nativeName: 'اردو', flag: 'UR', rtl: true },
+  { code: 'ur', name: 'Urdu', nativeName: 'اردو', flag: 'UR' },
 
 ];
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bell, Heart, MapPin, Phone, QrCode, Shield, Star, Users, Plus, Calendar, Plane } from "lucide-react";
+import { getTimeBasedGreeting } from '../../utils/i18n';
 
 const HomeScreen = ({
   currentLocation,
@@ -13,7 +14,7 @@ const HomeScreen = ({
   const { t, i18n } = useTranslation();
   
   // Get localized greeting based on time of day
-  const greeting = "Good morning, Alex"; // Simplified for Uber-like design
+  const greeting = getTimeBasedGreeting(t);
   
   // Format numbers according to locale
   const formattedScore = safetyScore.toFixed(0);
@@ -26,7 +27,7 @@ const HomeScreen = ({
       <div className="bg-white shadow-sm border-b border-gray-100 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600">Welcome back</p>
+            <p className="text-sm text-gray-600">{t('auth.welcomeBack')}</p>
             <h1 className="text-xl font-bold text-gray-900">{greeting}</h1>
           </div>
           <button className="p-3 text-gray-600 hover:bg-gray-50 rounded-full transition-colors">
