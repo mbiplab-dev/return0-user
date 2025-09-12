@@ -1,5 +1,6 @@
+
 // =============================================================================
-// COMPONENT: Signup Screen with i18n support
+// UPDATED SIGNUP SCREEN COMPONENT
 // File path: src/components/auth/SignupScreen.tsx
 // =============================================================================
 
@@ -9,6 +10,7 @@ import { Mail, Phone, Eye, EyeOff, User, ArrowRight, Check, Globe } from 'lucide
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import LanguageSelector from '../common/LanguageSelector';
+import authService from '../../services/authService';
 
 interface SignupScreenProps {
   onAuthSuccess: () => void;
@@ -61,7 +63,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onAuthSuccess }) => {
       return false;
     }
     if (formData.password.length < 6) {
-      toast.error(t('errors.fillRequiredFields'));
+      toast.error('Password must be at least 6 characters long');
       return false;
     }
     if (formData.password !== formData.confirmPassword) {
@@ -87,13 +89,21 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onAuthSuccess }) => {
 
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Prepare signup data
+      const signupData = {
+        username: formData.name,
+        email: formData.email,
+        password: formData.password,
+      };
+
+      // Call backend API
+      const response = await authService.signup(signupData);
       
-      toast.success(t('success.accountVerified'));
+      toast.success(response.message || t('success.accountVerified'));
       onAuthSuccess();
     } catch (error) {
-      toast.error(t('errors.networkError'));
+      const errorMessage = error instanceof Error ? error.message : t('errors.networkError');
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +112,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onAuthSuccess }) => {
   const handleGoogleAuth = async () => {
     setIsLoading(true);
     try {
-      // Simulate Google auth
+      // Simulate Google auth - you'll need to implement this
       await new Promise(resolve => setTimeout(resolve, 1000));
       toast.success(t('success.accountVerified'));
       onAuthSuccess();
@@ -136,11 +146,11 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onAuthSuccess }) => {
 
   const getPasswordStrengthText = () => {
     const strength = getPasswordStrength();
-    if (strength === 0) return t('common.status');
-    if (strength === 1) return t('common.status');
-    if (strength === 2) return t('common.status');
-    if (strength === 3) return t('common.status');
-    return t('common.status');
+    if (strength === 0) return 'Very Weak';
+    if (strength === 1) return 'Weak';
+    if (strength === 2) return 'Fair';
+    if (strength === 3) return 'Good';
+    return 'Strong';
   };
 
   return (
@@ -170,8 +180,8 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onAuthSuccess }) => {
 
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <div className="w-40 h-40 mx-auto mb-4"> {/* Removed gradient and flex styles */}
-            <img src="/logo.png" alt="App Logo" className="w-full h-full object-contain" /> {/* Added img tag */}
+          <div className="w-40 h-40 mx-auto mb-4">
+            <img src="/logo.png" alt="App Logo" className="w-full h-full object-contain" />
           </div>
         </div>
 

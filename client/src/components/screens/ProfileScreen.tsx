@@ -25,11 +25,7 @@ const ProfileScreen: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-100 px-6 py-4">
-        <h1 className="text-xl font-bold text-gray-900">
-          {t("profile.profile")}
-        </h1>
-      </div>
+    <Header title={t("profile.profile")}/>
 
       {/* Profile Header */}
       <div className="px-6 pt-6 pb-8">

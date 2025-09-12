@@ -9,6 +9,7 @@ import { Toaster } from "react-hot-toast";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./i18n";
+
 // Auth Components
 import LoginScreen from "./components/auth/LoginScreen";
 import SignupScreen from "./components/auth/SignupScreen";
@@ -20,6 +21,10 @@ import MapScreen from "./components/screens/MapScreen";
 import NotificationScreen from "./components/screens/NotificationScreen";
 import ProfileScreen from "./components/screens/ProfileScreen";
 import AddTripScreen from "./components/screens/AddTripScreen";
+import QuickCheckinScreen from "./components/screens/QuickCheckinScreen";
+import GroupStatusScreen from "./components/screens/GroupStatusScreen";
+import EmergencyContactsScreen from "./components/screens/EmergencyContactsScreen";
+import TripDetailsScreen from "./components/screens/TripDetailsScreen";
 import SOSInterface from "./components/sos/SOSInterface";
 
 // Types
@@ -31,6 +36,9 @@ import PhoneFrame from "./components/layout/PhoneFrame";
 
 // Mapbox access token
 mapboxgl.accessToken = import.meta.env.VITE_REACT_APP_MAPBOX_TOKEN;
+
+// Extended ActiveTab type to include new screens
+type ExtendedActiveTab = ActiveTab | "quickCheckin" | "groupStatus" | "emergencyContacts" | "tripDetails";
 
 // =============================================================================
 // MAIN APP COMPONENT
@@ -47,11 +55,12 @@ const SmartTouristApp: React.FC = () => {
     document.documentElement.dir = currentLang?.rtl ? "rtl" : "ltr";
     document.documentElement.lang = i18n.language;
   }, [i18n.language]);
+
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // State management
-  const [activeTab, setActiveTab] = useState<ActiveTab>("home");
+  const [activeTab, setActiveTab] = useState<ExtendedActiveTab>("home");
   const [sosState, setSosState] = useState<SOSState>("inactive");
   const [swipeProgress, setSwipeProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -148,6 +157,28 @@ const SmartTouristApp: React.FC = () => {
     setSosState("inactive");
     setSwipeProgress(0);
     setIsDragging(false);
+  };
+
+  // Navigation handlers for new screens
+  const handleQuickCheckinPress = () => {
+    setActiveTab("quickCheckin");
+  };
+
+  const handleGroupStatusPress = () => {
+    setActiveTab("groupStatus");
+  };
+
+  const handleEmergencyContactsPress = () => {
+    setActiveTab("emergencyContacts");
+  };
+
+  const handleTripDetailsPress = () => {
+    setActiveTab("tripDetails");
+  };
+
+  // Back navigation handlers
+  const handleBackToHome = () => {
+    setActiveTab("home");
   };
 
   // Trip management functions
@@ -370,6 +401,10 @@ const SmartTouristApp: React.FC = () => {
               groupMembers={groupMembers}
               notifications={notifications}
               onAddTripPress={handleAddTripPress}
+              onQuickCheckinPress={handleQuickCheckinPress}
+              onGroupStatusPress={handleGroupStatusPress}
+              onTripDetailsPress={handleTripDetailsPress}
+              onEmergencyContactsPress={handleEmergencyContactsPress}
               trips={trips}
             />
           );
@@ -391,6 +426,33 @@ const SmartTouristApp: React.FC = () => {
               onSaveTrip={handleSaveTrip}
             />
           );
+        case "quickCheckin":
+          return (
+            <QuickCheckinScreen
+              onBack={handleBackToHome}
+              currentLocation={currentLocation}
+            />
+          );
+        case "groupStatus":
+          return (
+            <GroupStatusScreen
+              onBack={handleBackToHome}
+              groupMembers={groupMembers}
+            />
+          );
+        case "emergencyContacts":
+          return (
+            <EmergencyContactsScreen
+              onBack={handleBackToHome}
+            />
+          );
+        case "tripDetails":
+          return (
+            <TripDetailsScreen
+              onBack={handleBackToHome}
+              trip={trips[0]} // Use first trip as default, or implement trip selection
+            />
+          );
         case "SOS":
           return (
             <SOSInterface
@@ -407,9 +469,12 @@ const SmartTouristApp: React.FC = () => {
       }
     };
 
+    const isMainNavTab = (tab: ExtendedActiveTab): tab is ActiveTab => {
+      return ["home", "map", "notifications", "profile", "addTrip", "SOS"].includes(tab);
+    };
+
     return (
-      
-      <div className="max-w-sm mx-auto bg-gray-50 min-h-screen flex flex-col">
+            <div className="max-w-sm mx-auto bg-gray-50 min-h-screen flex flex-col">
   {/* Scrollable screen */}
   <div className="flex-1 overflow-y-auto pb-16">
     {renderScreen()}
@@ -428,15 +493,12 @@ const SmartTouristApp: React.FC = () => {
     />
   </div>
 </div>
-
     );
   };
 
   return (
-    <div>
     <PhoneFrame>
     <Router>
-      
       <div className="App">
         {/* Toast Notifications */}
         <Toaster
@@ -512,10 +574,8 @@ const SmartTouristApp: React.FC = () => {
           />
         </Routes>
       </div>
-      
     </Router>
     </PhoneFrame>
-    </div>
   );
 };
 

@@ -65,8 +65,8 @@ const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
       const fetchHazards = async () => {
         try {
           const [resSachet, resLandslide] = await Promise.all([
-            fetch(import.meta.env.VITE_BASE_URL+"/api/sachet"),
-            fetch(import.meta.env.VITE_BASE_URL+"/api/landslide"),
+            fetch("http://localhost:5000/api/sachet"),
+            fetch("http://localhost:5000/api/landslide"),
           ]);
           const [sachetData, landslideData] = await Promise.all([
             resSachet.json(),

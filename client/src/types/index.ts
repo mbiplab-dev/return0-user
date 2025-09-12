@@ -17,7 +17,7 @@ export interface GroupMember {
 }
 
 export type SOSState = "inactive" | "swipe" | "sending" | "sent" | "waiting";
-export type ActiveTab = "home" | "map" | "notifications" | "profile" | "SOS" | "addTrip";
+export type ActiveTab = "home" | "map" | "notifications" | "profile" | "help" | "addTrip";
 
 export interface GroupMemberItemProps {
   member: GroupMember;
