@@ -11,8 +11,9 @@ export interface Language {
 }
 
 export const supportedLanguages: Language[] = [
-  { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸' },
-  { code: 'hi', name: 'Hindi', nativeName: 'हिंदी', flag: '🇮🇳' },
+  { code: 'en', name: 'English', nativeName: 'English', flag: 'EN' },
+  { code: 'hi', name: 'Hindi', nativeName: 'हिंदी', flag: 'HI' },
+
 ];
 
 export const getLanguageByCode = (code: string): Language | undefined => {

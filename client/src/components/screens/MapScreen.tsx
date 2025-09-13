@@ -1,21 +1,16 @@
-// =============================================================================
-// COMPONENT: Map Screen
-// File path: src/screens/MapScreen.tsx
-// =============================================================================
-
 import React, { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import * as turf from "@turf/turf";
 import "mapbox-gl/dist/mapbox-gl.css";
 
 import { AlertTriangle, Locate, Navigation, Search, Users } from "lucide-react";
-import GroupMemberItem from "../common/GroupMemberItem";
 import Header from "../layout/Header";
-import type { GroupMember } from "../../types";
-import { toast } from "react-hot-toast";
+import GroupMemberItem from "../common/GroupMemberItem";
+import { useTranslation } from "react-i18next";
+import toast from "react-hot-toast";
 
 interface MapScreenProps {
-  groupMembers: GroupMember[];
+  groupMembers: any[];
 }
 
 const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
@@ -23,6 +18,7 @@ const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const geojsonDataRef = useRef<any>(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
     mapboxgl.accessToken = import.meta.env.VITE_REACT_APP_MAPBOX_TOKEN;
@@ -162,42 +158,57 @@ const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
       await fetchHazards();
 
       // ✅ Marker dragend handler
-markerRef.current!.on("dragend", () => {
-  const lngLat = markerRef.current!.getLngLat();
-  const point = turf.point([lngLat.lng, lngLat.lat]);
+      markerRef.current!.on("dragend", () => {
+        const lngLat = markerRef.current!.getLngLat();
+        const point = turf.point([lngLat.lng, lngLat.lat]);
 
-  let isInRestricted = false;
-  const hazardMessages: string[] = [];
+        let isInRestricted = false;
+        const hazardMessages: string[] = [];
 
-  // Check restricted areas
-  geojsonDataRef.current.features.forEach((feature: any) => {
-    if (turf.booleanPointInPolygon(point, feature)) {
-      isInRestricted = true;
-      hazardMessages.push(`🚨 Restricted area: ${feature.properties.name || "Unnamed"}`);
-    }
-  });
+        // Check restricted areas
+        geojsonDataRef.current.features.forEach((feature: any) => {
+          if (turf.booleanPointInPolygon(point, feature)) {
+            isInRestricted = true;
+            hazardMessages.push(t('map.restrictedArea') + ": " + (feature.properties.name || ""));
+          }
+        });
 
-  // Check hazard areas
-  if (geojsonDataRef.current.hazards) {
-    geojsonDataRef.current.hazards.features.forEach((feature: any) => {
-      if (turf.booleanPointInPolygon(point, feature)) {
-        const props = feature.properties;
-        if (props.type === "Landslide") {
-          hazardMessages.push(`🚨 Landslide Alert: ${props.state}, ${props.district}, ${props.location}, ${props.status}`);
-        } else {
-          hazardMessages.push(`⚠️ ${props.disaster_type} Alert: ${props.area_description}, Severity: ${props.severity}`);
+        // Check hazard areas
+        if (geojsonDataRef.current.hazards) {
+          geojsonDataRef.current.hazards.features.forEach((feature: any) => {
+            if (turf.booleanPointInPolygon(point, feature)) {
+              const props = feature.properties;
+              if (props.type === "Landslide") {
+                hazardMessages.push(
+                  t('map.landslideAlert') + 
+                  ": " + 
+                  props.state + ", " + 
+                  props.district + ", " + 
+                  props.location + ", " + 
+                  props.status
+                );
+              } else {
+                hazardMessages.push(
+                  t('map.disasterAlert') + 
+                  ": " + 
+                  props.area_description + 
+                  ", " + 
+                  t('map.severity') + 
+                  ": " + 
+                  props.severity
+                );
+              }
+            }
+          });
         }
-      }
-    });
-  }
 
-  // Display combined alert
-  if (hazardMessages.length > 0) {
-    toast.error(hazardMessages.join("\n"));
-  } else {
-    toast.success("✅ Marker is in a safe zone");
-  }
-});
+        // Display combined alert
+        if (hazardMessages.length > 0) { 
+          toast.error(hazardMessages.join("\n"));
+        } else {
+          toast.success(t('map.safeZoneMessage'));
+        }
+      });
 
     });
 
@@ -207,17 +218,7 @@ markerRef.current!.on("dragend", () => {
   return (
     <div className="space-y-4">
       <Header
-        title="Live Map"
-        rightAction={
-          <div className="flex space-x-2">
-            <button className="p-3 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
-              <Locate size={18} className="text-gray-600" />
-            </button>
-            <button className="p-3 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
-              <Search size={18} className="text-gray-600" />
-            </button>
-          </div>
-        }
+        title={t('map.liveMap')}
       />
 
       <div className="px-4 space-y-4">
@@ -232,7 +233,6 @@ markerRef.current!.on("dragend", () => {
           <div className="absolute top-4 left-4 bg-white rounded-xl p-3 shadow-lg">
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-green-400 rounded-full" />
-              <span className="text-sm font-medium text-gray-700">You</span>
             </div>
           </div>
 
@@ -248,7 +248,7 @@ markerRef.current!.on("dragend", () => {
                 }
               }}
             >
-              Recenter
+              {t('map.recenter')}
             </button>
           </div>
         </div>
@@ -261,25 +261,25 @@ markerRef.current!.on("dragend", () => {
               {groupMembers.filter((m) => m.status === "safe").length}/
               {groupMembers.length}
             </p>
-            <p className="text-xs text-gray-500">Safe</p>
+            <p className="text-xs text-gray-500">{t('map.safe')}</p>
           </div>
 
           <div className="bg-white rounded-xl p-4 text-center border border-gray-100">
             <AlertTriangle className="text-orange-600 mx-auto mb-2" size={24} />
             <p className="text-lg font-bold text-gray-900">2</p>
-            <p className="text-xs text-gray-500">Warnings</p>
+            <p className="text-xs text-gray-500">{t('map.warnings')}</p>
           </div>
 
           <div className="bg-white rounded-xl p-4 text-center border border-gray-100">
             <Navigation className="text-blue-600 mx-auto mb-2" size={24} />
             <p className="text-lg font-bold text-gray-900">0.8km</p>
-            <p className="text-xs text-gray-500">To hotel</p>
+            <p className="text-xs text-gray-500">{t('map.toHotel')}</p>
           </div>
         </div>
 
         {/* Group Members */}
         <div className="bg-white rounded-2xl p-4 border border-gray-100">
-          <h3 className="font-semibold text-gray-900 mb-4">Travel Group</h3>
+          <h3 className="font-semibold text-gray-900 mb-4">{t('map.travelGroup')}</h3>
           <div className="space-y-3">
             {groupMembers.map((member) => (
               <GroupMemberItem key={member.id} member={member} />

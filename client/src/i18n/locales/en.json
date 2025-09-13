@@ -83,7 +83,7 @@
     "addDestinations": "Add destinations, members & itinerary",
     "yourTrips": "Your Trips",
     "viewAll": "View all",
-    "members": "members",
+    "members": "{{count}} members",
     "quickCheckin": "Quick Check-in",
     "scanLocationCode": "Scan location code",
     "groupStatus": "Group Status",
@@ -97,7 +97,6 @@
     "hrBpm": "HR: {{bpm}} BPM",
     "stepsToday": "{{steps}} steps today",
     "locationStatus": "Location Status",
-    "safeZone": "Safe Zone",
     "touristDistrict": "Tourist district • High security area",
     "travelGroup": "Travel Group",
     "membersCheckedIn": "Members checked in safely",
@@ -175,6 +174,7 @@
     "tripInfo": "Trip Info",
     "addMembers": "Add Members",
     "addItinerary": "Add Itinerary",
+    "viewTripInfo": "View trip information",
     "stepIndicator": {
       "step1": "Trip Info",
       "step2": "Add Members", 
@@ -219,6 +219,7 @@
     "landslideAlert": "Landslide Alert",
     "disasterAlert": "Disaster Alert",
     "severity": "Severity",
+    "currentLocation": "Current Location",
     "mapControls": {
       "locate": "My Location",
       "search": "Search Places",

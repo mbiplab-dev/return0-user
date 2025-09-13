@@ -16,7 +16,7 @@ import hi from './locales/hi.json';
 
 const resources = {
   en: { translation: en },
-  hi: { translation: hi }
+  hi: { translation: hi }, // Hindi
 };
 
 i18n
@@ -45,4 +45,3 @@ i18n
   });
 
 export default i18n;
-

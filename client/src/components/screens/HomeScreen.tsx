@@ -1,5 +1,5 @@
 // =============================================================================
-// Updated HomeScreen.tsx with i18n integration
+// Updated HomeScreen.tsx with navigation to new screens
 // =============================================================================
 
 import React from 'react';
@@ -17,6 +17,10 @@ interface HomeScreenProps {
   groupMembers: GroupMember[];
   notifications: Notification[];
   onAddTripPress: () => void;
+  onQuickCheckinPress: () => void;
+  onGroupStatusPress: () => void;
+  onTripDetailsPress: () => void;
+  onEmergencyContactsPress: () => void;
   trips: Trip[];
 }
 
@@ -26,6 +30,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   groupMembers,
   notifications,
   onAddTripPress,
+  onQuickCheckinPress,
+  onGroupStatusPress,
+  onTripDetailsPress,
+  onEmergencyContactsPress,
   trips,
 }) => {
   const { t, i18n } = useTranslation();
@@ -144,24 +152,28 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           title={t('home.quickCheckin')}
           subtitle={t('home.scanLocationCode')}
           color="bg-blue-500"
+          onClick={onQuickCheckinPress}
         />
         <QuickActionButton
           icon={Users}
           title={t('home.groupStatus')}
           subtitle={t('home.members', { count: groupMembers.length })}
           color="bg-purple-500"
+          onClick={onGroupStatusPress}
         />
         <QuickActionButton
-          icon={Shield}
-          title={t('home.safetyZone')}
-          subtitle={t('home.viewSafeAreas')}
+          icon={Plane}
+          title={t('trip.tripDetails')}
+          subtitle="View trip information"
           color="bg-green-500"
+          onClick={onTripDetailsPress}
         />
         <QuickActionButton
           icon={Phone}
           title={t('home.emergency')}
           subtitle={t('home.quickContacts')}
           color="bg-orange-500"
+          onClick={onEmergencyContactsPress}
         />
       </div>
 

@@ -54,7 +54,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 max-w-sm mx-auto bg-white border-t border-gray-200 px-4 py-2 shadow-lg">
+<div className="w-full bg-white border-t border-gray-200 px-4 py-2 shadow-lg rounded-b-2xl Z-100">
       <div className="flex justify-around items-center">
         {navigationItems.map(({ tab, icon: Icon, labelKey, badge, isSpecial }) => (
           <button

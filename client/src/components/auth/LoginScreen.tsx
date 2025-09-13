@@ -1,22 +1,26 @@
 // =============================================================================
-// COMPONENT: Login Screen
+// UPDATED LOGIN SCREEN COMPONENT (No Google Auth)
 // File path: src/components/auth/LoginScreen.tsx
 // =============================================================================
 
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Phone, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Mail, Phone, Eye, EyeOff, ArrowRight, Globe } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
+import LanguageSelector from '../common/LanguageSelector';
+import authService from '../../services/authService';
 
 interface LoginScreenProps {
   onAuthSuccess: () => void;
 }
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ onAuthSuccess }) => {
-  const navigate = useNavigate();
+  const { t } = useTranslation();
   const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('email');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     phone: '',
@@ -27,47 +31,55 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onAuthSuccess }) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Validate form
-      if (loginMethod === 'email' && !formData.email) {
-        toast.error('Please enter your email');
-        return;
-      }
-      if (loginMethod === 'phone' && !formData.phone) {
-        toast.error('Please enter your phone number');
-        return;
-      }
-      if (!formData.password) {
-        toast.error('Please enter your password');
-        return;
-      }
-
-      // Simulate successful login
-      toast.success('Login successful!');
-      onAuthSuccess();
-    } catch (error) {
-      toast.error('Login failed. Please try again.');
-    } finally {
-      setIsLoading(false);
+  const validateForm = () => {
+    if (loginMethod === 'email' && !formData.email.trim()) {
+      toast.error('Email is required');
+      return false;
     }
+    if (loginMethod === 'phone' && !formData.phone.trim()) {
+      toast.error('Phone number is required');
+      return false;
+    }
+    if (!formData.password) {
+      toast.error('Password is required');
+      return false;
+    }
+
+    // Email validation
+    if (loginMethod === 'email' && !/\S+@\S+\.\S+/.test(formData.email)) {
+      toast.error('Please enter a valid email address');
+      return false;
+    }
+
+    return true;
   };
 
-  const handleGoogleAuth = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) return;
+
     setIsLoading(true);
+
     try {
-      // Simulate Google auth
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      toast.success('Google login successful!');
+      // Prepare login data
+      const loginData = {
+        password: formData.password,
+        ...(loginMethod === 'email' 
+          ? { email: formData.email.trim().toLowerCase() }
+          : { phone: formData.phone.trim() }
+        )
+      };
+
+      // Call backend API
+      const response = await authService.login(loginData);
+      
+      toast.success(response.message || t('success.accountVerified'));
       onAuthSuccess();
+
     } catch (error) {
-      toast.error('Google login failed. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : t('errors.networkError');
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -76,13 +88,35 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onAuthSuccess }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
+        {/* Language Selector Button */}
+        <div className="flex justify-end mb-4">
+          <div className="relative">
+            <button
+              onClick={() => setShowLanguageSelector(!showLanguageSelector)}
+              className="flex items-center space-x-2 p-2 bg-white/80 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white transition-colors"
+            >
+              <Globe size={16} className="text-gray-600" />
+              <span className="text-sm font-medium text-gray-700">{t('common.language')}</span>
+            </button>
+            {showLanguageSelector && (
+              <div className="absolute right-28 bottom-0 mt-2 z-50 origin-top-right animate-fade-in-down">
+                <LanguageSelector
+                  compact={true}
+                  className="w-48"
+                  onSelect={() => setShowLanguageSelector(false)}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <span className="text-white font-bold text-2xl">ST</span>
+          <div className="w-40 h-40 mx-auto mb-4">
+            <img src="/logo.png" alt="App Logo" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
-          <p className="text-gray-600">Sign in to continue your journey</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back!</h2>
+          <p className="text-gray-600">{t('auth.signInToAccount')}</p>
         </div>
 
         {/* Login Form */}
@@ -98,7 +132,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onAuthSuccess }) => {
               }`}
             >
               <Mail size={18} className="inline mr-2" />
-              Email
+              {t('auth.email')}
             </button>
             <button
               onClick={() => setLoginMethod('phone')}
@@ -109,7 +143,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onAuthSuccess }) => {
               }`}
             >
               <Phone size={18} className="inline mr-2" />
-              Phone
+              {t('common.phone')}
             </button>
           </div>
 
@@ -117,7 +151,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onAuthSuccess }) => {
             {/* Email/Phone Input */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                {loginMethod === 'email' ? 'Email Address' : 'Phone Number'}
+                {loginMethod === 'email' ? t('auth.email') : t('common.phone')}
               </label>
               <div className="relative">
                 {loginMethod === 'email' ? (
@@ -130,7 +164,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onAuthSuccess }) => {
                   value={loginMethod === 'email' ? formData.email : formData.phone}
                   onChange={(e) => handleInputChange(loginMethod, e.target.value)}
                   className="w-full pl-12 pr-4 py-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50/50"
-                  placeholder={loginMethod === 'email' ? 'Enter your email' : 'Enter your phone number'}
+                  placeholder={loginMethod === 'email' ? t('auth.email') : t('common.phone')}
                   required
                 />
               </div>
@@ -139,7 +173,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onAuthSuccess }) => {
             {/* Password Input */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Password
+                {t('auth.password')}
               </label>
               <div className="relative">
                 <input
@@ -147,7 +181,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onAuthSuccess }) => {
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
                   className="w-full px-4 py-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-12 transition-all duration-200 bg-gray-50/50"
-                  placeholder="Enter your password"
+                  placeholder={t('auth.password')}
                   required
                 />
                 <button
@@ -166,7 +200,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onAuthSuccess }) => {
                 to="/forgot-password"
                 className="text-sm text-blue-600 hover:text-blue-700 font-medium"
               >
-                Forgot password?
+                {t('auth.forgotPassword')}
               </Link>
             </div>
 
@@ -180,44 +214,22 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onAuthSuccess }) => {
                 <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>Sign In</span>
+                  <span>{t('auth.login')}</span>
                   <ArrowRight size={18} />
                 </>
               )}
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="flex items-center my-6">
-            <div className="flex-1 border-t border-gray-200"></div>
-            <span className="px-4 text-gray-500 text-sm">or continue with</span>
-            <div className="flex-1 border-t border-gray-200"></div>
-          </div>
-
-          {/* Google Sign In */}
-          <button
-            onClick={handleGoogleAuth}
-            disabled={isLoading}
-            className="w-full flex items-center justify-center space-x-3 py-4 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24">
-              <path fill="#4285f4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34a853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#fbbc05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="#ea4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            <span className="text-gray-700 font-medium">Continue with Google</span>
-          </button>
-
           {/* Sign Up Link */}
           <div className="text-center mt-6">
             <p className="text-gray-600">
-              Don't have an account?{' '}
+              {t('auth.dontHaveAccount')}{' '}
               <Link
                 to="/signup"
                 className="text-blue-600 hover:text-blue-700 font-medium hover:underline"
               >
-                Sign up here
+                {t('auth.signup')}
               </Link>
             </p>
           </div>

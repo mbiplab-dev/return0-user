@@ -3,10 +3,10 @@
 // File path: src/components/common/LanguageSelector.tsx
 // =============================================================================
 
-import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Globe, Check, ChevronDown } from 'lucide-react';
-import { supportedLanguages, getLanguageByCode } from '../../i18n/languages';
+import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Globe, Check, ChevronDown } from "lucide-react";
+import { supportedLanguages, getLanguageByCode } from "../../i18n/languages";
 
 interface LanguageSelectorProps {
   className?: string;
@@ -16,7 +16,7 @@ interface LanguageSelectorProps {
 }
 
 const LanguageSelector: React.FC<LanguageSelectorProps> = ({
-  className = '',
+  className = "",
   showFlag = true,
   showNativeName = true,
   compact = false,
@@ -24,21 +24,22 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   const { i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
 
-  const currentLanguage = getLanguageByCode(i18n.language) || supportedLanguages[0];
+  const currentLanguage =
+    getLanguageByCode(i18n.language) || supportedLanguages[0];
 
   const handleLanguageChange = async (languageCode: string) => {
     try {
       await i18n.changeLanguage(languageCode);
       setIsOpen(false);
-      
+
       // Update document direction for RTL languages
       const selectedLang = getLanguageByCode(languageCode);
-      document.documentElement.dir = selectedLang?.rtl ? 'rtl' : 'ltr';
-      
+      document.documentElement.dir = selectedLang?.rtl ? "rtl" : "ltr";
+
       // Store in localStorage
-      localStorage.setItem('i18nextLng', languageCode);
+      localStorage.setItem("i18nextLng", languageCode);
     } catch (error) {
-      console.error('Failed to change language:', error);
+      console.error("Failed to change language:", error);
     }
   };
 
@@ -47,21 +48,23 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
       <div className={`relative ${className}`}>
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center space-x-2 p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          className="flex items-center space-x-2 p-2 bg-white/80 rounded-lg hover:bg-gray-200 transition-colors"
           aria-label="Select language"
         >
           <Globe size={16} className="text-gray-600" />
           {showFlag && <span className="text-sm">{currentLanguage.flag}</span>}
-          <ChevronDown 
-            size={14} 
-            className={`text-gray-600 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+          <ChevronDown
+            size={14}
+            className={`text-gray-600 transition-transform ${
+              isOpen ? "rotate-180" : ""
+            }`}
           />
         </button>
 
         {isOpen && (
           <>
-            <div 
-              className="fixed inset-0 z-40" 
+            <div
+              className="fixed inset-0 z-40"
               onClick={() => setIsOpen(false)}
               aria-hidden="true"
             />
@@ -72,14 +75,20 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                     key={language.code}
                     onClick={() => handleLanguageChange(language.code)}
                     className={`w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors ${
-                      i18n.language === language.code ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                      i18n.language === language.code
+                        ? "bg-blue-50 text-blue-600"
+                        : "text-gray-700"
                     }`}
                   >
-                    {showFlag && <span className="text-lg">{language.flag}</span>}
+                    {showFlag && (
+                      <span className="text-lg">{language.flag}</span>
+                    )}
                     <div className="flex-1 text-left">
                       <div className="font-medium">{language.name}</div>
                       {showNativeName && (
-                        <div className="text-sm text-gray-500">{language.nativeName}</div>
+                        <div className="text-sm text-gray-500">
+                          {language.nativeName}
+                        </div>
                       )}
                     </div>
                     {i18n.language === language.code && (
@@ -107,39 +116,50 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
             <div className="font-medium text-gray-900">Language</div>
             <div className="text-sm text-gray-500 flex items-center space-x-2">
               {showFlag && <span>{currentLanguage.flag}</span>}
-              <span>{showNativeName ? currentLanguage.nativeName : currentLanguage.name}</span>
+              <span>
+                {showNativeName
+                  ? currentLanguage.nativeName
+                  : currentLanguage.name}
+              </span>
             </div>
           </div>
         </div>
-        <ChevronDown 
-          size={20} 
-          className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+        <ChevronDown
+          size={20}
+          className={`text-gray-400 transition-transform ${
+            isOpen ? "rotate-180" : ""
+          }`}
         />
       </button>
 
       {isOpen && (
         <>
-          <div 
-            className="fixed inset-0 z-40" 
+          <div
+            className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
             aria-hidden="true"
           />
-          <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto">
+          <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto">
             <div className="p-2">
               {supportedLanguages.map((language) => (
                 <button
                   key={language.code}
                   onClick={() => handleLanguageChange(language.code)}
                   className={`w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors ${
-                    i18n.language === language.code ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                    i18n.language === language.code
+                      ? "bg-blue-50 text-blue-600"
+                      : "text-gray-700"
                   }`}
                 >
                   {showFlag && <span className="text-lg">{language.flag}</span>}
                   <div className="flex-1 text-left">
                     <div className="font-medium">{language.name}</div>
-                    {showNativeName && language.nativeName !== language.name && (
-                      <div className="text-sm text-gray-500">{language.nativeName}</div>
-                    )}
+                    {showNativeName &&
+                      language.nativeName !== language.name && (
+                        <div className="text-sm text-gray-500">
+                          {language.nativeName}
+                        </div>
+                      )}
                   </div>
                   {i18n.language === language.code && (
                     <Check size={16} className="text-blue-600" />
