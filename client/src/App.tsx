@@ -9,6 +9,7 @@ import {
   Routes,
   Route,
   Navigate,
+  useNavigate,
 } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import mapboxgl from "mapbox-gl";
@@ -50,10 +51,10 @@ mapboxgl.accessToken = import.meta.env.VITE_REACT_APP_MAPBOX_TOKEN;
 type ExtendedActiveTab = ActiveTab | "quickCheckin" | "groupStatus" | "emergencyContacts" | "tripDetails" | "addTrip";
 
 // =============================================================================
-// MAIN APP COMPONENT
+// MAIN APP COMPONENT WRAPPER
 // =============================================================================
 
-const SmartTouristApp: React.FC = () => {
+const AppWrapper: React.FC = () => {
   const { i18n } = useTranslation();
 
   useEffect(() => {
@@ -63,6 +64,22 @@ const SmartTouristApp: React.FC = () => {
     document.documentElement.dir = currentLang?.rtl ? "rtl" : "ltr";
     document.documentElement.lang = i18n.language;
   }, [i18n.language]);
+
+  return (
+    <PhoneFrame>
+      <Router>
+        <SmartTouristApp />
+      </Router>
+    </PhoneFrame>
+  );
+};
+
+// =============================================================================
+// MAIN APP COMPONENT
+// =============================================================================
+
+const SmartTouristApp: React.FC = () => {
+  const navigate = useNavigate();
 
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -207,8 +224,11 @@ const SmartTouristApp: React.FC = () => {
     setIsAuthenticated(true);
     setCurrentUser(authService.getUser());
     await loadActiveTrip(); // Load trip after successful auth
+    navigate('/app'); // Navigate to main app
   };
 
+  // Note: We don't need handleLogout here anymore as it's handled in ProfileScreen
+  // but we can keep it for any other logout scenarios
   const handleLogout = async () => {
     try {
       await authService.logout();
@@ -223,8 +243,32 @@ const SmartTouristApp: React.FC = () => {
       setIsDragging(false);
       setHasActiveTrip(false);
       setActiveTrip(null);
+      navigate('/login'); // Navigate to login page
     }
   };
+
+  // Set up listener for auth state changes (for when user logs out from ProfileScreen)
+  useEffect(() => {
+    const checkAuthState = () => {
+      if (!authService.isAuthenticated() && isAuthenticated) {
+        // User has been logged out
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+        setActiveTab("home");
+        setSosState("inactive");
+        setSwipeProgress(0);
+        setIsDragging(false);
+        setHasActiveTrip(false);
+        setActiveTrip(null);
+        navigate('/login');
+      }
+    };
+
+    // Check auth state periodically
+    const interval = setInterval(checkAuthState, 1000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, navigate]);
 
   // Navigation handlers for new screens
   const handleQuickCheckinPress = () => {
@@ -452,14 +496,12 @@ const SmartTouristApp: React.FC = () => {
   // Show loading screen during auth check
   if (isAuthLoading) {
     return (
-      <PhoneFrame>
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading...</p>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
         </div>
-      </PhoneFrame>
+      </div>
     );
   }
 
@@ -491,7 +533,7 @@ const SmartTouristApp: React.FC = () => {
         case "notifications":
           return <NotificationScreen notifications={notifications} />;
         case "profile":
-          return <ProfileScreen onLogout={handleLogout} currentUser={currentUser} />;
+          return <ProfileScreen />;
         case "addTrip":
           return (
             <AddTripScreen
@@ -566,86 +608,82 @@ const SmartTouristApp: React.FC = () => {
   };
 
   return (
-    <PhoneFrame>
-      <Router>
-        <div className="App">
-          {/* Toast Notifications */}
-          <Toaster
-            position="top-center"
-            toastOptions={{
-              duration: 4000,
-              style: {
-                background: "#363636",
-                color: "#fff",
-              },
-              success: {
-                duration: 3000,
-                iconTheme: {
-                  primary: "#4ade80",
-                  secondary: "#fff",
-                },
-              },
-              error: {
-                duration: 4000,
-                iconTheme: {
-                  primary: "#ef4444",
-                  secondary: "#fff",
-                },
-              },
-            }}
-          />
+    <div className="App">
+      {/* Toast Notifications */}
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: "#363636",
+            color: "#fff",
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: "#4ade80",
+              secondary: "#fff",
+            },
+          },
+          error: {
+            duration: 4000,
+            iconTheme: {
+              primary: "#ef4444",
+              secondary: "#fff",
+            },
+          },
+        }}
+      />
 
-          <Routes>
-            {/* Authentication Routes */}
-            <Route
-              path="/login"
-              element={
-                !isAuthenticated ? (
-                  <LoginScreen onAuthSuccess={handleAuthSuccess} />
-                ) : (
-                  <Navigate to="/app" replace />
-                )
-              }
-            />
-            <Route
-              path="/signup"
-              element={
-                !isAuthenticated ? (
-                  <SignupScreen onAuthSuccess={handleAuthSuccess} />
-                ) : (
-                  <Navigate to="/app" replace />
-                )
-              }
-            />
+      <Routes>
+        {/* Authentication Routes */}
+        <Route
+          path="/login"
+          element={
+            !isAuthenticated ? (
+              <LoginScreen onAuthSuccess={handleAuthSuccess} />
+            ) : (
+              <Navigate to="/app" replace />
+            )
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            !isAuthenticated ? (
+              <SignupScreen onAuthSuccess={handleAuthSuccess} />
+            ) : (
+              <Navigate to="/app" replace />
+            )
+          }
+        />
 
-            {/* Main App Route */}
-            <Route
-              path="/app"
-              element={
-                isAuthenticated ? <MainApp /> : <Navigate to="/login" replace />
-              }
-            />
+        {/* Main App Route */}
+        <Route
+          path="/app"
+          element={
+            isAuthenticated ? <MainApp /> : <Navigate to="/login" replace />
+          }
+        />
 
-            {/* Default Route */}
-            <Route
-              path="/"
-              element={
-                <Navigate to={isAuthenticated ? "/app" : "/login"} replace />
-              }
-            />
+        {/* Default Route */}
+        <Route
+          path="/"
+          element={
+            <Navigate to={isAuthenticated ? "/app" : "/login"} replace />
+          }
+        />
 
-            {/* Catch all route */}
-            <Route
-              path="*"
-              element={
-                <Navigate to={isAuthenticated ? "/app" : "/login"} replace />
-              }
-            />
-          </Routes>
-        </div>
-      </Router>
-    </PhoneFrame>
+        {/* Catch all route */}
+        <Route
+          path="*"
+          element={
+            <Navigate to={isAuthenticated ? "/app" : "/login"} replace />
+          }
+        />
+      </Routes>
+    </div>
   );
 };
 
-export default SmartTouristApp;
+export default AppWrapper;

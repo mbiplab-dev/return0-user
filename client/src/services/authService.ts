@@ -6,25 +6,25 @@
 const API_BASE_URL = 'http://localhost:5000/api';
 
 // Types and Interfaces
-interface SignupData {
+export interface SignupData {
   username: string;
   email: string;
   password: string;
   phone?: string;
 }
 
-interface LoginData {
+export interface LoginData {
   email?: string;
   phone?: string;
   password: string;
 }
 
-interface UpdateProfileData {
+export interface UpdateProfileData {
   username?: string;
   phone?: string;
 }
 
-interface User {
+export interface User {
   id: string;
   username: string;
   email: string;
@@ -33,18 +33,18 @@ interface User {
   updatedAt: string;
 }
 
-interface AuthResponse {
+export interface AuthResponse {
   message: string;
   user?: User;
   token?: string;
 }
 
-interface ApiError {
+export interface ApiError {
   message: string;
   errors?: string[];
 }
 
-interface ProfileResponse {
+export interface ProfileResponse {
   message: string;
   user: User;
 }
@@ -406,14 +406,3 @@ class AuthService {
 // Create and export a singleton instance
 const authService = new AuthService();
 export default authService;
-
-// Export types for use in components
-export type {
-  SignupData,
-  LoginData,
-  UpdateProfileData,
-  User,
-  AuthResponse,
-  ApiError,
-  ProfileResponse
-};
