@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import {
   User,
   Shield,
@@ -15,35 +16,132 @@ import {
   HelpCircle,
   Settings,
   LogOut,
+  Loader,
 } from "lucide-react";
 import Header from "../layout/Header";
 import LanguageSelector from "../common/LanguageSelector";
+import authService, {type User as UserType } from "../../services/authService";
 
 const ProfileScreen: React.FC = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [user, setUser] = useState<UserType | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        setLoading(true);
+        
+        // Check if user is authenticated
+        if (!authService.isAuthenticated()) {
+          navigate('/login');
+          return;
+        }
+
+        // Get user data from auth service
+        let userData = authService.getUser();
+        
+        // If no user data in memory, fetch from API
+        if (!userData) {
+          userData = await authService.getProfile();
+        }
+        
+        setUser(userData);
+      } catch (error) {
+        console.error('Failed to load user data:', error);
+        // If failed to get user data, redirect to login
+        navigate('/login');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, [navigate]);
+
+  const handleLogout = async () => {
+    try {
+      setLoggingOut(true);
+      await authService.logout();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Even if logout API fails, clear local data and redirect
+      navigate('/login', { replace: true });
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString();
+    } catch {
+      return dateString;
+    }
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word.charAt(0))
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <Loader className="animate-spin text-blue-600" size={24} />
+          <span className="text-gray-600">{t("common.loading", "Loading...")}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">{t("profile.noUserData", "No user data available")}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-    <Header title={t("profile.profile")}/>
+      <Header title={t("profile.profile")}/>
 
       {/* Profile Header */}
       <div className="px-6 pt-6 pb-8">
         <div className="flex items-center space-x-4">
-          <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center border-2 border-gray-100">
-            <User className="text-gray-500" size={40} />
-          </div>
           <div className="flex-1">
-            <h2 className="text-2xl font-bold text-gray-900">Alex Johnson</h2>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {user.username || t("profile.defaultUsername", "User")}
+            </h2>
             <p className="text-gray-600 mt-1">
-              {t("profile.touristLocation", { location: "Dubai, UAE" })}
+              {user.email}
             </p>
+            {user.phone && (
+              <p className="text-gray-500 text-sm mt-1">
+                {user.phone}
+              </p>
+            )}
             <div className="flex items-center mt-2">
               <Shield className="text-green-500 mr-1" size={16} />
               <span className="text-xs text-green-600 font-medium">
                 {t("profile.verifiedIdentity")}
               </span>
             </div>
+            <p className="text-xs text-gray-400 mt-1">
+              {t("profile.memberSince", "Member since")}: {formatDate(user.createdAt)}
+            </p>
           </div>
         </div>
       </div>
@@ -188,15 +286,40 @@ const ProfileScreen: React.FC = () => {
           <ChevronRight className="text-gray-400" size={20} />
         </button>
 
-        <button className="w-full bg-white rounded-2xl p-5 shadow-sm border border-red-200 flex items-center justify-between hover:shadow-md transition-all duration-200 hover:bg-red-50">
+        <button 
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className="w-full bg-white rounded-2xl p-5 shadow-sm border border-red-200 flex items-center justify-between hover:shadow-md transition-all duration-200 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           <div className="flex items-center space-x-4">
-            <LogOut className="text-red-600" size={20} />
+            {loggingOut ? (
+              <Loader className="text-red-600 animate-spin" size={20} />
+            ) : (
+              <LogOut className="text-red-600" size={20} />
+            )}
             <span className="font-semibold text-red-600">
-              {t("profile.signOut")}
+              {loggingOut ? t("profile.loggingOut", "Logging out...") : t("profile.signOut")}
             </span>
           </div>
           <ChevronRight className="text-red-400" size={20} />
         </button>
+      </div>
+
+      {/* User Info Section */}
+      <div className="mx-6 px-6 mt-6 bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <h3 className="font-semibold text-gray-900 mb-4">
+          {t("profile.accountInfo", "Account Information")}
+        </h3>
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-600">{t("profile.userId", "User ID")}:</span>
+            <span className="text-gray-900 font-mono text-xs">{user.id}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">{t("profile.lastUpdated", "Last Updated")}:</span>
+            <span className="text-gray-900">{formatDate(user.updatedAt)}</span>
+          </div>
+        </div>
       </div>
 
       {/* App Version */}
