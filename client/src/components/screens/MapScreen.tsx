@@ -47,101 +47,104 @@ const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
   };
 
   useEffect(() => {
-    mapboxgl.accessToken = import.meta.env.VITE_REACT_APP_MAPBOX_TOKEN;
+  mapboxgl.accessToken = import.meta.env.VITE_REACT_APP_MAPBOX_TOKEN;
 
-    // ✅ Initialize map
-    mapRef.current = new mapboxgl.Map({
-      container: mapContainer.current!,
-      style: "mapbox://styles/mapbox/streets-v12",
-      center: [92.9376, 26.2006], // Assam
-      zoom: 6,
+  // ✅ Initialize map
+  mapRef.current = new mapboxgl.Map({
+    container: mapContainer.current!,
+    style: "mapbox://styles/mapbox/streets-v12",
+    center: [92.9376, 26.2006], // Assam
+    zoom: 6,
+  });
+
+  mapRef.current.on("load", async () => {
+    // ✅ Load restricted areas
+    const response = await fetch("/data.json");
+    const geojson = await response.json();
+    geojsonDataRef.current = geojson;
+
+    mapRef.current!.addSource("restricted-areas", {
+      type: "geojson",
+      data: geojson,
     });
 
-    mapRef.current.on("load", async () => {
-      // ✅ Load restricted areas
-      const response = await fetch("/data.json");
-      const geojson = await response.json();
-      geojsonDataRef.current = geojson;
+    mapRef.current!.addLayer({
+      id: "restricted-fill",
+      type: "fill",
+      source: "restricted-areas",
+      paint: { "fill-color": "#f00", "fill-opacity": 0.4 },
+    });
 
-      mapRef.current!.addSource("restricted-areas", {
-        type: "geojson",
-        data: geojson,
+    // ✅ Draggable marker
+    markerRef.current = new mapboxgl.Marker({ draggable: true })
+      .setLngLat([92.9376, 26.2006])
+      .addTo(mapRef.current!);
+
+    // --- Helper to build hazards with scale ---
+    const buildHazards = (
+      sachetData: any[],
+      landslideData: any[],
+      scale = 1
+    ) => {
+      const features: any[] = [];
+
+      // Sachet alerts → 2km * scale
+      sachetData.forEach((a: any) => {
+        if (!a.centroid) return;
+        const [lon, lat] = a.centroid.split(",").map(Number);
+        const circle = turf.circle([lon, lat], 2 * scale, {
+          units: "kilometers",
+          steps: 64,
+        });
+        features.push({
+          type: "Feature",
+          geometry: circle.geometry,
+          properties: { ...a, type: "Sachet" },
+        });
       });
 
-      mapRef.current!.addLayer({
-        id: "restricted-fill",
-        type: "fill",
-        source: "restricted-areas",
-        paint: { "fill-color": "#f08", "fill-opacity": 0.4 },
+      // Landslides → 2km * scale
+      landslideData.forEach((ls: any) => {
+        if (!ls.lat || !ls.lon) return;
+        const circle = turf.circle([ls.lon, ls.lat], 2 * scale, {
+          units: "kilometers",
+          steps: 64,
+        });
+        features.push({
+          type: "Feature",
+          geometry: circle.geometry,
+          properties: { ...ls, type: "Landslide" },
+        });
       });
 
-      mapRef.current!.addLayer({
-        id: "restricted-outline",
-        type: "line",
-        source: "restricted-areas",
-        paint: { "line-color": "#c00", "line-width": 2 },
-      });
+      return { type: "FeatureCollection", features };
+    };
 
-      // ✅ Draggable marker
-      markerRef.current = new mapboxgl.Marker({ draggable: true })
-        .setLngLat([92.9376, 26.2006])
-        .addTo(mapRef.current!);
+    // ✅ Fetch hazards and add as circles
+    const fetchHazards = async () => {
+      try {
+        const [resSachet, resLandslide] = await Promise.all([
+          fetch("http://localhost:5000/api/sachet"),
+          fetch("http://localhost:5000/api/landslide"),
+        ]);
+        const [sachetData, landslideData] = await Promise.all([
+          resSachet.json(),
+          resLandslide.json(),
+        ]);
 
-      // ✅ Fetch hazards and add as circles
-      const fetchHazards = async () => {
-        try {
-          const [resSachet, resLandslide] = await Promise.all([
-            fetch("http://localhost:5000/api/sachet"),
-            fetch("http://localhost:5000/api/landslide"),
-          ]);
-          const [sachetData, landslideData] = await Promise.all([
-            resSachet.json(),
-            resLandslide.json(),
-          ]);
+        // Base (constant size)
+        const baseHazards = buildHazards(sachetData, landslideData, 1);
 
-          const features: any[] = [];
-
-          // Sachet alerts → 2km circles
-          sachetData.forEach((a: any) => {
-            if (!a.centroid) return;
-            const [lon, lat] = a.centroid.split(",").map(Number);
-            const circle = turf.circle([lon, lat], 2, {
-              units: "kilometers",
-              steps: 64,
-            });
-            features.push({
-              type: "Feature",
-              geometry: circle.geometry,
-              properties: { ...a, type: "Sachet" },
-            });
-          });
-
-          // Landslides → 2km circles
-          landslideData.forEach((ls: any) => {
-            if (!ls.lat || !ls.lon) return;
-            const circle = turf.circle([ls.lon, ls.lat], 2, {
-              units: "kilometers",
-              steps: 64,
-            });
-            features.push({
-              type: "Feature",
-              geometry: circle.geometry,
-              properties: { ...ls, type: "Landslide" },
-            });
-          });
-
-          const hazardGeojson = { type: "FeatureCollection", features };
-
-          mapRef.current!.addSource("hazards", {
+        if (!mapRef.current!.getSource("hazards-base")) {
+          mapRef.current!.addSource("hazards-base", {
             type: "geojson",
-            data: hazardGeojson,
+            data: baseHazards,
           });
 
-          // Fill layer
           mapRef.current!.addLayer({
-            id: "hazard-fill",
+            id: "hazard-base-fill",
             type: "fill",
-            source: "hazards",
+            source: "hazards-base",
             paint: {
               "fill-color": [
                 "match",
@@ -152,135 +155,159 @@ const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
                 "#8B4513",
                 "#888",
               ],
-              "fill-opacity": 0.25,
+              "fill-opacity": 0.45,
             },
           });
+        }
 
-          // Outline layer (same color, darker)
+        // --- Pulse source (animated) ---
+        if (!mapRef.current!.getSource("hazards-pulse")) {
+          mapRef.current!.addSource("hazards-pulse", {
+            type: "geojson",
+            data: baseHazards,
+          });
+
           mapRef.current!.addLayer({
-            id: "hazard-outline",
-            type: "line",
-            source: "hazards",
+            id: "hazard-pulse-fill",
+            type: "fill",
+            source: "hazards-pulse",
             paint: {
-              "line-color": [
+              "fill-color": [
                 "match",
                 ["get", "type"],
                 "Sachet",
-                "#c88617",
+                "#fbb03b",
                 "Landslide",
-                "#5a2f0e",
-                "#444",
+                "#8B4513",
+                "#888",
               ],
-              "line-width": 2,
+              "fill-opacity": 0.35,
             },
           });
-
-          geojsonDataRef.current.hazards = hazardGeojson;
-        } catch (err) {
-          console.error("Failed to fetch hazards:", err);
         }
-      };
 
-      await fetchHazards();
+        geojsonDataRef.current.hazards = baseHazards;
 
-      // ✅ Marker dragend handler with notification creation
-      markerRef.current!.on("dragend", async () => {
-        const lngLat = markerRef.current!.getLngLat();
-        const point = turf.point([lngLat.lng, lngLat.lat]);
+        // --- Animate hazard pulse (ping effect) ---
+        let scale = 1;
+        let direction = 0.01;
 
-        let isInRestricted = false;
-        const hazardMessages: string[] = [];
-
-        // Check restricted areas
-        geojsonDataRef.current.features.forEach((feature: any) => {
-          if (turf.booleanPointInPolygon(point, feature)) {
-            isInRestricted = true;
-            const message = t('map.restrictedArea') + ": " + (feature.properties.name || "");
-            hazardMessages.push(message);
-            
-            // Create notification for restricted area
-            createHazardNotification(
-              'restricted_area',
-              `You have entered a restricted area: ${feature.properties.name || 'Unknown area'}. Please move to a safe location.`,
-              {
-                type: 'Point',
-                coordinates: [lngLat.lng, lngLat.lat] as [number, number],
-                address: feature.properties.name || 'Restricted Area'
-              }
-            );
+        const animateHazards = () => {
+          scale += direction;
+          if (scale > 2 || scale < 1) {
+            direction *= -1;
           }
-        });
+          const newData = buildHazards(sachetData, landslideData, scale);
+          const source = mapRef.current!.getSource(
+            "hazards-pulse"
+          ) as mapboxgl.GeoJSONSource;
+          if (source) source.setData(newData);
 
-        // Check hazard areas
-        if (geojsonDataRef.current.hazards) {
-          geojsonDataRef.current.hazards.features.forEach((feature: any) => {
-            if (turf.booleanPointInPolygon(point, feature)) {
-              const props = feature.properties;
-              let message = '';
-              let hazardType = '';
-              
-              if (props.type === "Landslide") {
-                hazardType = 'landslide';
-                message = `Landslide Alert: ${props.state}, ${props.district}, ${props.location}, Status: ${props.status}`;
-                hazardMessages.push(
-                  t('map.landslideAlert') + 
-                  ": " + 
-                  props.state + ", " + 
-                  props.district + ", " + 
-                  props.location + ", " + 
-                  props.status
-                );
-                
-                // Create notification for landslide
-                createHazardNotification(
-                  hazardType,
-                  `Landslide hazard detected at your location. Area: ${props.location}, ${props.district}, ${props.state}. Status: ${props.status}. Please avoid this area and move to safety.`,
-                  {
-                    type: 'Point',
-                    coordinates: [lngLat.lng, lngLat.lat] as [number, number],
-                    address: `${props.location}, ${props.district}, ${props.state}`
-                  }
-                );
-              } else {
-                hazardType = 'sachet';
-                message = `Disaster Alert: ${props.area_description}, Severity: ${props.severity}`;
-                hazardMessages.push(
-                  t('map.disasterAlert') + 
-                  ": " + 
-                  props.area_description + 
-                  ", " + 
-                  t('map.severity') + 
-                  ": " + 
-                  props.severity
-                );
-                
-                // Create notification for sachet alert
-                createHazardNotification(
-                  hazardType,
-                  `Disaster alert in your area: ${props.area_description}. Severity level: ${props.severity}. Please take necessary precautions.`,
-                  {
-                    type: 'Point',
-                    coordinates: [lngLat.lng, lngLat.lat] as [number, number],
-                    address: props.area_description || 'Alert Area'
-                  }
-                );
-              }
+          requestAnimationFrame(animateHazards);
+        };
+
+        animateHazards();
+      } catch (err) {
+        console.error("Failed to fetch hazards:", err);
+      }
+    };
+
+    await fetchHazards();
+
+    // ✅ Marker dragend handler with notifications
+    markerRef.current!.on("dragend", async () => {
+      const lngLat = markerRef.current!.getLngLat();
+      const point = turf.point([lngLat.lng, lngLat.lat]);
+
+      let isInRestricted = false;
+      const hazardMessages: string[] = [];
+
+      // Restricted areas check
+      geojsonDataRef.current.features.forEach((feature: any) => {
+        if (turf.booleanPointInPolygon(point, feature)) {
+          isInRestricted = true;
+          const message = t("map.restrictedArea") + ": " + (feature.properties.name || "");
+          hazardMessages.push(message);
+
+          createHazardNotification(
+            "restricted_area",
+            `You have entered a restricted area: ${feature.properties.name || "Unknown area"}. Please move to a safe location.`,
+            {
+              type: "Point",
+              coordinates: [lngLat.lng, lngLat.lat] as [number, number],
+              address: feature.properties.name || "Restricted Area",
             }
-          });
-        }
-
-        // Display combined alert
-        if (hazardMessages.length > 0) { 
-          toast.error(hazardMessages.join("\n"));
-        } else {
-          toast.success(t('map.safeZoneMessage'));
+          );
         }
       });
 
-    });
+      // Hazards check
+      if (geojsonDataRef.current.hazards) {
+        geojsonDataRef.current.hazards.features.forEach((feature: any) => {
+          if (turf.booleanPointInPolygon(point, feature)) {
+            const props = feature.properties;
+            let hazardType = "";
 
-    return () => mapRef.current?.remove();
-  }, [t]);
+            if (props.type === "Landslide") {
+              hazardType = "landslide";
+              hazardMessages.push(
+                t("map.landslideAlert") +
+                  ": " +
+                  props.state +
+                  ", " +
+                  props.district +
+                  ", " +
+                  props.location +
+                  ", " +
+                  props.status
+              );
+
+              createHazardNotification(
+                hazardType,
+                `Landslide hazard detected at your location. Area: ${props.location}, ${props.district}, ${props.state}. Status: ${props.status}. Please avoid this area and move to safety.`,
+                {
+                  type: "Point",
+                  coordinates: [lngLat.lng, lngLat.lat] as [number, number],
+                  address: `${props.location}, ${props.district}, ${props.state}`,
+                }
+              );
+            } else {
+              hazardType = "sachet";
+              hazardMessages.push(
+                t("map.disasterAlert") +
+                  ": " +
+                  props.area_description +
+                  ", " +
+                  t("map.severity") +
+                  ": " +
+                  props.severity
+              );
+
+              createHazardNotification(
+                hazardType,
+                `Disaster alert in your area: ${props.area_description}. Severity level: ${props.severity}. Please take necessary precautions.`,
+                {
+                  type: "Point",
+                  coordinates: [lngLat.lng, lngLat.lat] as [number, number],
+                  address: props.area_description || "Alert Area",
+                }
+              );
+            }
+          }
+        });
+      }
+
+      if (hazardMessages.length > 0) {
+        toast.error(hazardMessages.join("\n"));
+      } else {
+        toast.success(t("map.safeZoneMessage"));
+      }
+    });
+  });
+
+  return () => mapRef.current?.remove();
+}, [t]);
+
 
   return (
     <div className="space-y-4">
