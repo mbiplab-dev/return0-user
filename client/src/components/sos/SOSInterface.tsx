@@ -1,9 +1,9 @@
 // =============================================================================
-// COMPONENT: Redesigned SOS Help Interface
+// UPDATED SOS INTERFACE WITH BACKEND INTEGRATION
 // File path: src/components/sos/SOSInterface.tsx
 // =============================================================================
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Zap,
   MapPin,
@@ -21,12 +21,15 @@ import {
   X,
   Camera,
   FileText,
-  Send
+  Send,
+  Clock,
+  MessageCircle
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
 import type { SOSState } from "../../types";
 import Header from "../layout/Header";
+import sosService, { type SubmitComplaintData, type SOSComplaint } from "../../services/sosService";
 
 interface SOSInterfaceProps {
   sosState: SOSState;
@@ -58,6 +61,14 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
   const { t } = useTranslation();
   const [showHelpForm, setShowHelpForm] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [recentComplaints, setRecentComplaints] = useState<SOSComplaint[]>([]);
+  const [isLoadingComplaints, setIsLoadingComplaints] = useState(false);
+  const [currentLocationData, setCurrentLocationData] = useState<{
+    address: string;
+    coordinates?: [number, number];
+  }>({ address: currentLocation });
+
   const [helpRequest, setHelpRequest] = useState<HelpRequest>({
     category: '',
     urgency: 'medium',
@@ -68,56 +79,50 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
     additionalInfo: ''
   });
 
-  const helpCategories = [
-    {
-      id: 'missing_person',
-      title: 'Missing Person',
-      description: 'Report a missing group member or individual',
-      icon: UserX,
-      color: 'bg-red-500',
-      urgency: 'high' as const
-    },
-    {
-      id: 'fire_emergency',
-      title: 'Fire Emergency',
-      description: 'Fire incident or smoke detection',
-      icon: Flame,
-      color: 'bg-orange-500',
-      urgency: 'critical' as const
-    },
-    {
-      id: 'theft_robbery',
-      title: 'Theft/Robbery',
-      description: 'Report stolen items or robbery incident',
-      icon: ShieldAlert,
-      color: 'bg-purple-500',
-      urgency: 'high' as const
-    },
-    {
-      id: 'accident',
-      title: 'Accident',
-      description: 'Traffic accident or injury incident',
-      icon: Car,
-      color: 'bg-blue-500',
-      urgency: 'critical' as const
-    },
-    {
-      id: 'medical_help',
-      title: 'Medical Help',
-      description: 'Non-emergency medical assistance',
-      icon: HeartHandshake,
-      color: 'bg-green-500',
-      urgency: 'medium' as const
-    },
-    {
-      id: 'general_help',
-      title: 'General Help',
-      description: 'Other assistance or information needed',
-      icon: AlertTriangle,
-      color: 'bg-gray-500',
-      urgency: 'low' as const
+  // Load current location and recent complaints on mount
+  useEffect(() => {
+    loadCurrentLocation();
+    loadRecentComplaints();
+  }, []);
+
+  const loadCurrentLocation = async () => {
+    try {
+      const location = await sosService.getCurrentLocation();
+      setCurrentLocationData(location);
+      setHelpRequest(prev => ({ ...prev, location: location.address }));
+    } catch (error) {
+      console.error('Failed to get current location:', error);
     }
-  ];
+  };
+
+  const loadRecentComplaints = async () => {
+    try {
+      setIsLoadingComplaints(true);
+      const response = await sosService.getUserComplaints({ 
+        limit: 5,
+        page: 1
+      });
+      setRecentComplaints(response.complaints);
+    } catch (error) {
+      console.error('Failed to load recent complaints:', error);
+    } finally {
+      setIsLoadingComplaints(false);
+    }
+  };
+
+  const helpCategories = sosService.getHelpCategories().map(category => ({
+    ...category,
+    icon: category.id === 'missing_person' ? UserX :
+          category.id === 'fire_emergency' ? Flame :
+          category.id === 'theft_robbery' ? ShieldAlert :
+          category.id === 'accident' ? Car :
+          category.id === 'medical_help' ? HeartHandshake :
+          AlertTriangle,
+    color: category.urgency === 'critical' ? 'bg-red-500' :
+           category.urgency === 'high' ? 'bg-orange-500' :
+           category.urgency === 'medium' ? 'bg-green-500' :
+           'bg-gray-500'
+  }));
 
   const handleCategorySelect = (category: typeof helpCategories[0]) => {
     setSelectedCategory(category.id);
@@ -130,25 +135,95 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
     setShowHelpForm(true);
   };
 
-  const handleSubmitHelp = () => {
-    if (!helpRequest.description || !helpRequest.contactInfo) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
+  const handleSubmitHelp = async () => {
+    try {
+      // Validate form data
+      const validation = sosService.validateComplaintData({
+        category: helpRequest.category,
+        title: helpRequest.title,
+        description: helpRequest.description,
+        urgency: helpRequest.urgency,
+        contactInfo: helpRequest.contactInfo,
+        location: {
+          address: helpRequest.location,
+          coordinates: currentLocationData.coordinates
+        },
+        additionalInfo: helpRequest.additionalInfo
+      });
 
-    // Simulate help request submission
-    console.log('Help request submitted:', helpRequest);
-    toast.success('Help request submitted successfully');
-    setShowHelpForm(false);
-    setHelpRequest({
-      category: '',
-      urgency: 'medium',
-      title: '',
-      description: '',
-      location: currentLocation,
-      contactInfo: '',
-      additionalInfo: ''
-    });
+      if (!validation.isValid) {
+        validation.errors.forEach(error => toast.error(error));
+        return;
+      }
+
+      setIsSubmitting(true);
+
+      const complaintData: SubmitComplaintData = {
+        category: helpRequest.category,
+        title: helpRequest.title,
+        description: helpRequest.description,
+        urgency: helpRequest.urgency,
+        contactInfo: helpRequest.contactInfo,
+        location: {
+          address: helpRequest.location,
+          coordinates: currentLocationData.coordinates
+        },
+        additionalInfo: helpRequest.additionalInfo,
+        isEmergencySOS: false
+      };
+
+      const complaint = await sosService.submitComplaint(complaintData);
+      
+      toast.success('Help request submitted successfully');
+      
+      // Reset form and go back to main view
+      setShowHelpForm(false);
+      setHelpRequest({
+        category: '',
+        urgency: 'medium',
+        title: '',
+        description: '',
+        location: currentLocationData.address,
+        contactInfo: '',
+        additionalInfo: ''
+      });
+      
+      // Reload recent complaints
+      await loadRecentComplaints();
+
+    } catch (error: any) {
+      console.error('Submit help request error:', error);
+      toast.error(error.message || 'Failed to submit help request');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEmergencySOS = async () => {
+    try {
+      setIsSubmitting(true);
+      
+      const emergencyData = {
+        description: 'Emergency SOS activated - immediate assistance required',
+        location: {
+          address: currentLocationData.address,
+          coordinates: currentLocationData.coordinates
+        }
+      };
+
+      await sosService.submitEmergencySOS(emergencyData);
+      
+      toast.success('Emergency SOS activated successfully');
+      
+      // Reload recent complaints
+      await loadRecentComplaints();
+      
+    } catch (error: any) {
+      console.error('Emergency SOS error:', error);
+      toast.error(error.message || 'Failed to activate emergency SOS');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleInputChange = (field: keyof HelpRequest, value: string) => {
@@ -165,12 +240,35 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
     }
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'resolved': return 'bg-green-100 text-green-800';
+      case 'in_progress': return 'bg-blue-100 text-blue-800';
+      case 'assigned': return 'bg-purple-100 text-purple-800';
+      case 'under_review': return 'bg-yellow-100 text-yellow-800';
+      case 'submitted': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   if (sosState === "inactive") return null;
 
   return (
     <div className="h-full w-full bg-gray-50 flex flex-col">
       {/* Header */}
-      <Header title="Help"/>
+      <Header 
+        title="Help & Emergency"
+        rightAction={
+          showHelpForm ? (
+            <button
+              onClick={() => setShowHelpForm(false)}
+              className="text-blue-600 font-medium"
+            >
+              Cancel
+            </button>
+          ) : null
+        }
+      />
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-4 space-y-4 py-4">
@@ -192,7 +290,8 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
                     <button
                       key={category.id}
                       onClick={() => handleCategorySelect(category)}
-                      className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] group"
+                      disabled={isSubmitting}
+                      className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] group disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <div className="text-center">
                         <div className={`${category.color} p-3 rounded-xl mx-auto mb-3 group-hover:scale-110 transition-transform w-fit`}>
@@ -217,30 +316,59 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
                 <div className="p-2 bg-blue-50 rounded-lg">
                   <MapPin size={20} className="text-blue-600" />
                 </div>
-                <div>
+                <div className="flex-1">
                   <h3 className="font-semibold text-gray-900">Your Current Location</h3>
-                  <p className="text-sm text-gray-600">{currentLocation}</p>
+                  <p className="text-sm text-gray-600">{currentLocationData.address}</p>
                 </div>
+                <button
+                  onClick={loadCurrentLocation}
+                  className="text-blue-600 text-sm font-medium"
+                >
+                  Update
+                </button>
               </div>
             </div>
 
             {/* Recent Help Requests */}
             <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
               <h3 className="font-semibold text-gray-900 mb-3">Recent Help Requests</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-green-50 rounded-xl border border-green-200">
-                  <div className="flex items-center space-x-3">
-                    <CheckCircle className="text-green-600" size={16} />
-                    <div>
-                      <p className="text-sm font-medium text-green-800">General Help</p>
-                      <p className="text-xs text-green-600">Resolved - 2 hours ago</p>
-                    </div>
-                  </div>
-                </div>
+              {isLoadingComplaints ? (
                 <div className="text-center py-4">
-                  <p className="text-sm text-gray-500">No other recent requests</p>
+                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                  <p className="text-sm text-gray-500">Loading...</p>
                 </div>
-              </div>
+              ) : recentComplaints.length > 0 ? (
+                <div className="space-y-3">
+                  {recentComplaints.slice(0, 3).map((complaint) => (
+                    <div key={complaint._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-2 h-2 rounded-full ${complaint.status === 'resolved' ? 'bg-green-500' : complaint.status === 'in_progress' ? 'bg-blue-500' : 'bg-yellow-500'}`} />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{complaint.title}</p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${getStatusColor(complaint.status || 'submitted')}`}>
+                              {(complaint.status || 'submitted').replace('_', ' ').toUpperCase()}
+                            </span>
+                            <span className="text-xs text-gray-500 flex items-center">
+                              <Clock size={12} className="mr-1" />
+                              {complaint.createdAt ? new Date(complaint.createdAt).toLocaleDateString() : 'Recently'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {recentComplaints.length > 3 && (
+                    <button className="w-full text-center text-blue-600 text-sm font-medium py-2">
+                      View All Requests
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-500">No recent help requests</p>
+                </div>
+              )}
             </div>
           </>
         ) : (
@@ -272,6 +400,7 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
                     value={helpRequest.urgency}
                     onChange={(e) => handleInputChange('urgency', e.target.value)}
                     className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={isSubmitting}
                   >
                     <option value="low">Low - Can wait for assistance</option>
                     <option value="medium">Medium - Need help soon</option>
@@ -289,6 +418,7 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
                     onChange={(e) => handleInputChange('description', e.target.value)}
                     placeholder="Describe your situation in detail..."
                     className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent h-24 resize-none"
+                    disabled={isSubmitting}
                   />
                 </div>
 
@@ -302,6 +432,7 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
                     onChange={(e) => handleInputChange('contactInfo', e.target.value)}
                     placeholder="Phone number or best way to reach you"
                     className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={isSubmitting}
                   />
                 </div>
 
@@ -314,6 +445,7 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
                     value={helpRequest.location}
                     onChange={(e) => handleInputChange('location', e.target.value)}
                     className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={isSubmitting}
                   />
                 </div>
 
@@ -326,27 +458,26 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
                     onChange={(e) => handleInputChange('additionalInfo', e.target.value)}
                     placeholder="Any other relevant details..."
                     className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20 resize-none"
+                    disabled={isSubmitting}
                   />
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex space-x-3 pt-2">
-                  <button className="flex-1 bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-medium hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2">
-                    <Camera size={18} />
-                    <span>Add Photo</span>
-                  </button>
-                  <button className="flex-1 bg-blue-100 text-blue-700 py-3 px-4 rounded-xl font-medium hover:bg-blue-200 transition-colors flex items-center justify-center space-x-2">
-                    <FileText size={18} />
-                    <span>Add Document</span>
-                  </button>
                 </div>
 
                 <button
                   onClick={handleSubmitHelp}
-                  className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+                  disabled={isSubmitting}
+                  className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Send size={18} />
-                  <span>Submit Help Request</span>
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Submitting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send size={18} />
+                      <span>Submit Help Request</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -374,8 +505,8 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
                     280
                   )}px) scale(${swipeProgress > 80 ? 1.1 : 1})`,
                 }}
-                onMouseDown={onSwipeStart}
-                onTouchStart={onSwipeStart}
+                onMouseDown={(e) => !isSubmitting && onSwipeStart(e)}
+                onTouchStart={(e) => !isSubmitting && onSwipeStart(e)}
               >
                 {swipeProgress > 80 ? (
                   <CheckCircle className="text-red-600" size={24} />
@@ -388,7 +519,7 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
               {swipeProgress < 50 && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
                   <span className="text-white font-medium text-sm ml-8">
-                    Slide to call 911
+                    {isSubmitting ? 'Processing...' : 'Slide to call 911'}
                   </span>
                 </div>
               )}
@@ -425,6 +556,12 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
               <p className="text-green-600 text-sm">
                 Help is on the way. Stay on the line.
               </p>
+              <button
+                onClick={handleEmergencySOS}
+                className="mt-3 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium"
+              >
+                Log Emergency Report
+              </button>
             </div>
           )}
 
@@ -464,6 +601,14 @@ const SOSInterface: React.FC<SOSInterfaceProps> = ({
                   <p className="text-xs text-gray-600">Notified</p>
                 </div>
               </div>
+              
+              <button
+                onClick={handleEmergencySOS}
+                disabled={isSubmitting}
+                className="w-full bg-red-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {isSubmitting ? 'Logging...' : 'Log Emergency Details'}
+              </button>
             </div>
           )}
         </div>
