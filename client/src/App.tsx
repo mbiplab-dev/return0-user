@@ -1,5 +1,5 @@
 // =============================================================================
-// UPDATED APP COMPONENT WITH AUTH INTEGRATION
+// UPDATED APP COMPONENT WITH TRIP MANAGEMENT
 // File path: src/App.tsx
 // =============================================================================
 
@@ -34,10 +34,11 @@ import SOSInterface from "./components/sos/SOSInterface";
 
 // Services
 import authService from "./services/authService";
+import tripService from "./services/tripService";
 
 // Types
 import type { ActiveTab, SOSState, GroupMember, Notification } from "./types";
-import type { Trip } from "./types/trip";
+import type { Trip } from "./services/tripService";
 import { useTranslation } from "react-i18next";
 import { supportedLanguages } from "./i18n/languages";
 import PhoneFrame from "./components/layout/PhoneFrame";
@@ -46,7 +47,7 @@ import PhoneFrame from "./components/layout/PhoneFrame";
 mapboxgl.accessToken = import.meta.env.VITE_REACT_APP_MAPBOX_TOKEN;
 
 // Extended ActiveTab type to include new screens
-type ExtendedActiveTab = ActiveTab | "quickCheckin" | "groupStatus" | "emergencyContacts" | "tripDetails";
+type ExtendedActiveTab = ActiveTab | "quickCheckin" | "groupStatus" | "emergencyContacts" | "tripDetails" | "addTrip";
 
 // =============================================================================
 // MAIN APP COMPONENT
@@ -68,6 +69,10 @@ const SmartTouristApp: React.FC = () => {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
 
+  // Trip state
+  const [activeTrip, setActiveTrip] = useState<Trip | null>(null);
+  const [hasActiveTrip, setHasActiveTrip] = useState(false);
+
   // Check authentication status on app load
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -77,6 +82,8 @@ const SmartTouristApp: React.FC = () => {
           if (isValid) {
             setIsAuthenticated(true);
             setCurrentUser(authService.getUser());
+            // Load active trip after authentication
+            await loadActiveTrip();
           } else {
             // Token is invalid, clear auth state
             await authService.logout();
@@ -96,6 +103,19 @@ const SmartTouristApp: React.FC = () => {
     checkAuthStatus();
   }, []);
 
+  // Load active trip
+  const loadActiveTrip = async () => {
+    try {
+      const tripStatus = await tripService.checkActiveTrip();
+      setHasActiveTrip(tripStatus.hasActiveTrip);
+      setActiveTrip(tripStatus.activeTrip);
+    } catch (error) {
+      console.error('Failed to load active trip:', error);
+      setHasActiveTrip(false);
+      setActiveTrip(null);
+    }
+  };
+
   // State management
   const [activeTab, setActiveTab] = useState<ExtendedActiveTab>("home");
   const [sosState, setSosState] = useState<SOSState>("inactive");
@@ -106,7 +126,6 @@ const SmartTouristApp: React.FC = () => {
   // App data
   const [currentLocation] = useState("Dubai Marina, UAE");
   const [safetyScore] = useState(85);
-  const [trips, setTrips] = useState<Trip[]>([]);
 
   // Map refs
   const mapContainer = useRef<HTMLDivElement | null>(null);
@@ -184,9 +203,10 @@ const SmartTouristApp: React.FC = () => {
   ]);
 
   // Authentication handlers
-  const handleAuthSuccess = () => {
+  const handleAuthSuccess = async () => {
     setIsAuthenticated(true);
     setCurrentUser(authService.getUser());
+    await loadActiveTrip(); // Load trip after successful auth
   };
 
   const handleLogout = async () => {
@@ -201,6 +221,8 @@ const SmartTouristApp: React.FC = () => {
       setSosState("inactive");
       setSwipeProgress(0);
       setIsDragging(false);
+      setHasActiveTrip(false);
+      setActiveTrip(null);
     }
   };
 
@@ -221,31 +243,24 @@ const SmartTouristApp: React.FC = () => {
     setActiveTab("tripDetails");
   };
 
+  const handleAddTripPress = () => {
+    setActiveTab("addTrip");
+  };
+
   // Back navigation handlers
   const handleBackToHome = () => {
     setActiveTab("home");
   };
 
-  // Trip management functions
-  const handleSaveTrip = (
-    tripData: Omit<Trip, "id" | "createdAt" | "updatedAt">
-  ) => {
-    const newTrip: Trip = {
-      ...tripData,
-      id: Math.random().toString(36).substr(2, 9),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setTrips((prev) => [...prev, newTrip]);
-    console.log("Trip saved:", newTrip);
+  // Trip management handlers
+  const handleTripSaved = async () => {
+    // Reload active trip after saving
+    await loadActiveTrip();
   };
 
-  const handleAddTripPress = () => {
-    setActiveTab("addTrip");
-  };
-
-  const handleBackFromAddTrip = () => {
-    setActiveTab("home");
+  const handleTripCompleted = async () => {
+    // Reload active trip after completion
+    await loadActiveTrip();
   };
 
   // Map initialization
@@ -464,7 +479,6 @@ const SmartTouristApp: React.FC = () => {
               onGroupStatusPress={handleGroupStatusPress}
               onTripDetailsPress={handleTripDetailsPress}
               onEmergencyContactsPress={handleEmergencyContactsPress}
-              trips={trips}
             />
           );
         case "map":
@@ -481,8 +495,8 @@ const SmartTouristApp: React.FC = () => {
         case "addTrip":
           return (
             <AddTripScreen
-              onBack={handleBackFromAddTrip}
-              onSaveTrip={handleSaveTrip}
+              onBack={handleBackToHome}
+              onTripSaved={handleTripSaved}
             />
           );
         case "quickCheckin":
@@ -509,7 +523,7 @@ const SmartTouristApp: React.FC = () => {
           return (
             <TripDetailsScreen
               onBack={handleBackToHome}
-              trip={trips[0]} // Use first trip as default, or implement trip selection
+              onTripCompleted={handleTripCompleted}
             />
           );
         case "SOS":
