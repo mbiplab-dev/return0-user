@@ -100,7 +100,6 @@ class TripService {
         method: 'POST',
         body: JSON.stringify(tripData),
       });
-
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to create trip');
@@ -173,8 +172,9 @@ class TripService {
         const error = await response.json();
         throw new Error(error.message || 'Failed to check active trip');
       }
-
-      return await response.json();
+      const rs = await response.json()
+      console.log(rs)
+      return rs;
     } catch (error) {
       console.error('Check active trip error:', error);
       return { hasActiveTrip: false, activeTrip: null };

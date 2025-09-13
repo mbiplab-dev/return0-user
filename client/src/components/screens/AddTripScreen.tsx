@@ -243,38 +243,6 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onTripSaved }) =>
     }
   };
 
-  const renderStepIndicator = () => (
-    <div className="flex items-center justify-center mb-6 px-4">
-      <div className="flex items-center space-x-2 pt-2 px-2">
-        {[
-          { key: 'basic', labelKey: 'trip.stepIndicator.step1' },
-          { key: 'members', labelKey: 'trip.stepIndicator.step2' },
-          { key: 'itinerary', labelKey: 'trip.stepIndicator.step3' }
-        ].map((step, index) => (
-          <React.Fragment key={step.key}>
-            <button
-              onClick={() => setCurrentStep(step.key as any)}
-              className={`flex items-center space-x-2 px-2 py-2 rounded-lg text-sm font-medium transition-colors ${
-                currentStep === step.key
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-              disabled={isSaving}
-            >
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                currentStep === step.key ? 'bg-white text-blue-600' : 'bg-gray-300 text-gray-600'
-              }`}>
-                {index + 1}
-              </span>
-              <span>{t(step.labelKey)}</span>
-            </button>
-            {index < 2 && <div className="w-8 h-px bg-gray-300" />}
-          </React.Fragment>
-        ))}
-      </div>
-    </div>
-  );
-
   const renderBasicInfo = () => (
     <div className="px-4 space-y-4">
       <div className="bg-white rounded-2xl p-6 border border-gray-100">
@@ -799,8 +767,6 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onTripSaved }) =>
           </button>
         }
       />
-
-      {renderStepIndicator()}
 
       <div className="pb-6">
         {currentStep === 'basic' && renderBasicInfo()}

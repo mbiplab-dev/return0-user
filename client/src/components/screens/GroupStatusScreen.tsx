@@ -59,8 +59,8 @@ const GroupStatusScreen: React.FC<GroupStatusScreenProps> = ({
       
       <div className="px-4 space-y-6">
         {/* Group Overview */}
-        <div className="bg-gradient-to-br from-purple-600 via-purple-500 to-blue-600 rounded-3xl p-6 text-white relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent" />
+        <div className="bg-gray-700 rounded-3xl p-6 text-white relative overflow-hidden">
+          <div className="absolute inset-0  to-transparent" />
           <div className="relative">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
