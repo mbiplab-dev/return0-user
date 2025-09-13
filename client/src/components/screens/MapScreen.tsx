@@ -1,3 +1,8 @@
+// =============================================================================
+// UPDATED MAP SCREEN WITH NOTIFICATION INTEGRATION
+// File path: client/src/components/screens/MapScreen.tsx
+// =============================================================================
+
 import React, { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import * as turf from "@turf/turf";
@@ -8,6 +13,7 @@ import Header from "../layout/Header";
 import GroupMemberItem from "../common/GroupMemberItem";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
+import notificationService from "../../services/notificationService";
 
 interface MapScreenProps {
   groupMembers: any[];
@@ -19,6 +25,26 @@ const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const geojsonDataRef = useRef<any>(null);
   const { t } = useTranslation();
+
+  // Helper function to create notification for hazard alert
+  const createHazardNotification = async (hazardType: string, message: string, location?: any) => {
+    try {
+      const lngLat = markerRef.current?.getLngLat();
+      const notificationLocation = location || (lngLat ? {
+        type: 'Point',
+        coordinates: [lngLat.lng, lngLat.lat] as [number, number],
+        address: 'Current Location'
+      } : undefined);
+
+      await notificationService.handleMapHazardAlert(
+        hazardType,
+        message,
+        notificationLocation
+      );
+    } catch (error) {
+      console.error('Failed to create hazard notification:', error);
+    }
+  };
 
   useEffect(() => {
     mapboxgl.accessToken = import.meta.env.VITE_REACT_APP_MAPBOX_TOKEN;
@@ -157,8 +183,8 @@ const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
 
       await fetchHazards();
 
-      // ✅ Marker dragend handler
-      markerRef.current!.on("dragend", () => {
+      // ✅ Marker dragend handler with notification creation
+      markerRef.current!.on("dragend", async () => {
         const lngLat = markerRef.current!.getLngLat();
         const point = turf.point([lngLat.lng, lngLat.lat]);
 
@@ -169,7 +195,19 @@ const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
         geojsonDataRef.current.features.forEach((feature: any) => {
           if (turf.booleanPointInPolygon(point, feature)) {
             isInRestricted = true;
-            hazardMessages.push(t('map.restrictedArea') + ": " + (feature.properties.name || ""));
+            const message = t('map.restrictedArea') + ": " + (feature.properties.name || "");
+            hazardMessages.push(message);
+            
+            // Create notification for restricted area
+            createHazardNotification(
+              'restricted_area',
+              `You have entered a restricted area: ${feature.properties.name || 'Unknown area'}. Please move to a safe location.`,
+              {
+                type: 'Point',
+                coordinates: [lngLat.lng, lngLat.lat] as [number, number],
+                address: feature.properties.name || 'Restricted Area'
+              }
+            );
           }
         });
 
@@ -178,7 +216,12 @@ const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
           geojsonDataRef.current.hazards.features.forEach((feature: any) => {
             if (turf.booleanPointInPolygon(point, feature)) {
               const props = feature.properties;
+              let message = '';
+              let hazardType = '';
+              
               if (props.type === "Landslide") {
+                hazardType = 'landslide';
+                message = `Landslide Alert: ${props.state}, ${props.district}, ${props.location}, Status: ${props.status}`;
                 hazardMessages.push(
                   t('map.landslideAlert') + 
                   ": " + 
@@ -187,7 +230,20 @@ const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
                   props.location + ", " + 
                   props.status
                 );
+                
+                // Create notification for landslide
+                createHazardNotification(
+                  hazardType,
+                  `Landslide hazard detected at your location. Area: ${props.location}, ${props.district}, ${props.state}. Status: ${props.status}. Please avoid this area and move to safety.`,
+                  {
+                    type: 'Point',
+                    coordinates: [lngLat.lng, lngLat.lat] as [number, number],
+                    address: `${props.location}, ${props.district}, ${props.state}`
+                  }
+                );
               } else {
+                hazardType = 'sachet';
+                message = `Disaster Alert: ${props.area_description}, Severity: ${props.severity}`;
                 hazardMessages.push(
                   t('map.disasterAlert') + 
                   ": " + 
@@ -196,6 +252,17 @@ const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
                   t('map.severity') + 
                   ": " + 
                   props.severity
+                );
+                
+                // Create notification for sachet alert
+                createHazardNotification(
+                  hazardType,
+                  `Disaster alert in your area: ${props.area_description}. Severity level: ${props.severity}. Please take necessary precautions.`,
+                  {
+                    type: 'Point',
+                    coordinates: [lngLat.lng, lngLat.lat] as [number, number],
+                    address: props.area_description || 'Alert Area'
+                  }
                 );
               }
             }
@@ -213,7 +280,7 @@ const MapScreen: React.FC<MapScreenProps> = ({ groupMembers }) => {
     });
 
     return () => mapRef.current?.remove();
-  }, []);
+  }, [t]);
 
   return (
     <div className="space-y-4">
