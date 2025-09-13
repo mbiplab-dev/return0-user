@@ -1,15 +1,18 @@
 // =============================================================================
-// Updated HomeScreen.tsx with navigation to new screens
+// Updated HomeScreen.tsx with Active Trip Logic
+// File path: src/components/screens/HomeScreen.tsx
 // =============================================================================
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Bell, Heart, MapPin, Phone, QrCode, Shield, Star, Users, Plus, Calendar, Plane } from "lucide-react";
+import { Bell, Heart, MapPin, Phone, QrCode, Shield, Star, Users, Plus, Calendar, Plane, Clock, CheckCircle } from "lucide-react";
+import { toast } from "react-hot-toast";
 import QuickActionButton from "../common/QuickActionButton";
 import StatusCard from "../common/StatusCard";
 import { getTimeBasedGreeting, formatNumber, getRelativeTime } from "../../utils/i18n";
+import tripService from "../../services/tripService";
 import type { GroupMember, Notification } from "../../types";
-import type { Trip } from "../../types/trip";
+import type { Trip } from "../../services/tripService";
 
 interface HomeScreenProps {
   currentLocation: string;
@@ -21,7 +24,6 @@ interface HomeScreenProps {
   onGroupStatusPress: () => void;
   onTripDetailsPress: () => void;
   onEmergencyContactsPress: () => void;
-  trips: Trip[];
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -34,9 +36,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   onGroupStatusPress,
   onTripDetailsPress,
   onEmergencyContactsPress,
-  trips,
 }) => {
   const { t, i18n } = useTranslation();
+  
+  // State for active trip
+  const [activeTrip, setActiveTrip] = useState<Trip | null>(null);
+  const [hasActiveTrip, setHasActiveTrip] = useState(false);
+  const [isLoadingTrip, setIsLoadingTrip] = useState(true);
   
   // Get localized greeting based on time of day
   const greeting = getTimeBasedGreeting(t);
@@ -45,6 +51,58 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const formattedScore = formatNumber(safetyScore, i18n.language);
   const stepCount = 8421; // Example step count
   const formattedSteps = formatNumber(stepCount, i18n.language);
+
+  // Load active trip on component mount
+  useEffect(() => {
+    loadActiveTrip();
+  }, []);
+
+  const loadActiveTrip = async () => {
+    try {
+      setIsLoadingTrip(true);
+      const tripStatus = await tripService.checkActiveTrip();
+      setHasActiveTrip(tripStatus.hasActiveTrip);
+      setActiveTrip(tripStatus.activeTrip);
+    } catch (error) {
+      console.error('Failed to load active trip:', error);
+      setHasActiveTrip(false);
+      setActiveTrip(null);
+    } finally {
+      setIsLoadingTrip(false);
+    }
+  };
+
+  const handleTripComplete = async () => {
+    if (!activeTrip?._id) return;
+    
+    try {
+      await tripService.completeTrip(activeTrip._id);
+      toast.success('Trip completed successfully!');
+      await loadActiveTrip(); // Refresh trip status
+    } catch (error) {
+      toast.error('Failed to complete trip');
+      console.error('Complete trip error:', error);
+    }
+  };
+
+  const calculateTripProgress = (startDate: string, endDate: string): number => {
+    const start = new Date(startDate).getTime();
+    const end = new Date(endDate).getTime();
+    const now = Date.now();
+    
+    if (now < start) return 0;
+    if (now > end) return 100;
+    
+    return Math.round(((now - start) / (end - start)) * 100);
+  };
+
+  const getDaysRemaining = (endDate: string): number => {
+    const end = new Date(endDate).getTime();
+    const now = Date.now();
+    const diffTime = end - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, diffDays);
+  };
 
   return (
     <div className="space-y-6 p-4">
@@ -96,56 +154,114 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </div>
 
-      {/* Add Trip Button - Prominent placement */}
-      <button
-        onClick={onAddTripPress}
-        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-      >
-        <div className="flex items-center justify-center space-x-3">
-          <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-            <Plus size={24} />
+      {/* Conditional Content based on Active Trip */}
+      {isLoadingTrip ? (
+        // Loading state
+        <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
           </div>
-          <div className="text-left">
-            <h3 className="text-lg font-bold">{t('home.planNewTrip')}</h3>
-            <p className="text-blue-100 text-sm">{t('home.addDestinations')}</p>
-          </div>
-          <Plane size={28} className="text-white/80" />
         </div>
-      </button>
-
-      {/* Current Trips */}
-      {trips.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">{t('home.yourTrips')}</h3>
-            <button className="text-sm text-blue-600 font-medium">{t('home.viewAll')}</button>
+      ) : !hasActiveTrip ? (
+        // No Active Trip - Show Add Trip Button
+        <button
+          onClick={onAddTripPress}
+          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+        >
+          <div className="flex items-center justify-center space-x-3">
+            <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+              <Plus size={24} />
+            </div>
+            <div className="text-left">
+              <h3 className="text-lg font-bold">{t('home.planNewTrip')}</h3>
+              <p className="text-blue-100 text-sm">{t('home.addDestinations')}</p>
+            </div>
+            <Plane size={28} className="text-white/80" />
           </div>
-          <div className="space-y-3">
-            {trips.slice(0, 2).map((trip) => (
-              <div key={trip.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-semibold text-gray-900">{trip.name}</h4>
-                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                    {t('home.members', { count: trip.members.length })}
-                  </span>
+        </button>
+      ) : (
+        // Has Active Trip - Show Trip Info
+        <div className="space-y-4">
+          {/* Active Trip Card */}
+          <div className="bg-gradient-to-br from-green-600 via-blue-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+                  <Plane size={20} />
                 </div>
-                <div className="flex items-center space-x-4 text-sm text-gray-600">
-                  <div className="flex items-center space-x-1">
+                <div>
+                  <h3 className="text-lg font-bold">{activeTrip?.name}</h3>
+                  <p className="text-green-100 text-sm flex items-center space-x-1">
                     <MapPin size={14} />
-                    <span>{trip.destination}</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <Calendar size={14} />
-                    <span>{new Date(trip.startDate).toLocaleDateString(i18n.language)}</span>
-                  </div>
+                    <span>{activeTrip?.destination}</span>
+                  </p>
                 </div>
               </div>
-            ))}
+              <div className="text-center">
+                <div className="text-2xl font-bold">{getDaysRemaining(activeTrip?.endDate || '')}</div>
+                <div className="text-xs text-green-100">days left</div>
+              </div>
+            </div>
+
+            {/* Trip Progress */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Trip Progress</span>
+                <span>{calculateTripProgress(activeTrip?.startDate || '', activeTrip?.endDate || '')}%</span>
+              </div>
+              <div className="w-full bg-white/20 rounded-full h-2">
+                <div 
+                  className="bg-white rounded-full h-2 transition-all duration-300"
+                  style={{ 
+                    width: `${calculateTripProgress(activeTrip?.startDate || '', activeTrip?.endDate || '')}%` 
+                  }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Trip Actions */}
+            <div className="flex space-x-3 mt-4">
+              <button
+                onClick={onTripDetailsPress}
+                className="flex-1 bg-white/20 backdrop-blur-sm text-white py-2 px-4 rounded-xl text-sm font-medium hover:bg-white/30 transition-colors"
+              >
+                View Details
+              </button>
+              <button
+                onClick={handleTripComplete}
+                className="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-xl text-sm font-medium transition-colors flex items-center space-x-1"
+              >
+                <CheckCircle size={16} />
+                <span>Complete</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Trip Stats */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm text-center">
+              <Users className="text-blue-600 mx-auto mb-1" size={20} />
+              <div className="text-lg font-bold text-gray-900">{activeTrip?.members.length || 0}</div>
+              <div className="text-xs text-gray-600">Members</div>
+            </div>
+            <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm text-center">
+              <MapPin className="text-green-600 mx-auto mb-1" size={20} />
+              <div className="text-lg font-bold text-gray-900">{activeTrip?.itinerary.length || 0}</div>
+              <div className="text-xs text-gray-600">Places</div>
+            </div>
+            <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm text-center">
+              <Clock className="text-purple-600 mx-auto mb-1" size={20} />
+              <div className="text-lg font-bold text-gray-900">
+                {activeTrip ? Math.ceil((new Date(activeTrip.endDate).getTime() - new Date(activeTrip.startDate).getTime()) / (1000 * 60 * 60 * 24)) : 0}
+              </div>
+              <div className="text-xs text-gray-600">Days</div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Quick Actions */}
+      {/* Quick Actions - Always show these */}
       <div className="grid grid-cols-2 gap-4">
         <QuickActionButton
           icon={QrCode}
@@ -162,11 +278,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           onClick={onGroupStatusPress}
         />
         <QuickActionButton
-          icon={Plane}
-          title={t('trip.tripDetails')}
-          subtitle="View trip information"
+          icon={Calendar}
+          title="Trip History"
+          subtitle="View past trips"
           color="bg-green-500"
-          onClick={onTripDetailsPress}
+          onClick={() => {}} // Add trip history handler
         />
         <QuickActionButton
           icon={Phone}

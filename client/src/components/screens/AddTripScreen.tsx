@@ -1,5 +1,5 @@
 // =============================================================================
-// COMPONENT: Add Trip Screen with i18n support
+// Updated AddTripScreen.tsx with API Integration
 // File path: src/components/screens/AddTripScreen.tsx
 // =============================================================================
 
@@ -12,30 +12,40 @@ import {
   Users,
   Save,
   X,
-  Phone,
-  CreditCard,
   UserPlus,
   Edit3,
-  AlertCircle
+  Loader
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
 import Header from "../layout/Header";
-import type { Trip, TripMember, PhoneNumber, TripItinerary } from "../../types/trip";
+import tripService from "../../services/tripService";
+import type { TripMember, TripItinerary } from "../../services/tripService";
+
+interface PhoneNumber {
+  id: string;
+  number: string;
+  type: 'primary' | 'emergency' | 'other';
+}
 
 interface AddTripScreenProps {
   onBack: () => void;
-  onSaveTrip: (trip: Omit<Trip, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onTripSaved: () => void; // Callback when trip is successfully saved
 }
 
-const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => {
+const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onTripSaved }) => {
   const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState<'basic' | 'members' | 'itinerary'>('basic');
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Basic trip info
   const [tripName, setTripName] = useState("");
   const [destination, setDestination] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [description, setDescription] = useState("");
+  
+  // Members and itinerary
   const [members, setMembers] = useState<TripMember[]>([]);
   const [itinerary, setItinerary] = useState<TripItinerary[]>([]);
   
@@ -192,25 +202,45 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
     ));
   };
 
-  const handleSaveTrip = () => {
+  const handleSaveTrip = async () => {
     if (!tripName || !destination || !startDate || !endDate) {
       toast.error(t('trip.fillRequiredFields'));
       return;
     }
 
-    const trip: Omit<Trip, 'id' | 'createdAt' | 'updatedAt'> = {
-      name: tripName,
-      destination,
-      startDate,
-      endDate,
-      description,
-      members,
-      itinerary
-    };
+    // Validate dates
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (start >= end) {
+      toast.error('End date must be after start date');
+      return;
+    }
 
-    onSaveTrip(trip);
-    toast.success(t('success.tripSaved'));
-    onBack();
+    setIsSaving(true);
+    
+    try {
+      const tripData = {
+        name: tripName,
+        destination,
+        description,
+        startDate,
+        endDate,
+        members,
+        itinerary: itinerary.filter(day => day.date && day.location) // Only include complete itinerary items
+      };
+
+      const formattedTripData = tripService.formatTripForApi(tripData);
+      await tripService.createTrip(formattedTripData);
+      
+      toast.success(t('success.tripSaved'));
+      onTripSaved(); // Notify parent component
+      onBack();
+    } catch (error: any) {
+      console.error('Save trip error:', error);
+      toast.error(error.message || 'Failed to save trip');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const renderStepIndicator = () => (
@@ -224,11 +254,12 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
           <React.Fragment key={step.key}>
             <button
               onClick={() => setCurrentStep(step.key as any)}
-              className={`flex items-center space-x-2 px-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center space-x-2 px-2 py-2 rounded-lg text-sm font-medium transition-colors ${
                 currentStep === step.key
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
+              disabled={isSaving}
             >
               <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
                 currentStep === step.key ? 'bg-white text-blue-600' : 'bg-gray-300 text-gray-600'
@@ -262,6 +293,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
               onChange={(e) => setTripName(e.target.value)}
               placeholder={t('trip.tripNamePlaceholder')}
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isSaving}
             />
           </div>
 
@@ -275,6 +307,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
               onChange={(e) => setDestination(e.target.value)}
               placeholder={t('trip.destinationPlaceholder')}
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isSaving}
             />
           </div>
 
@@ -287,7 +320,9 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]} // Prevent past dates
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isSaving}
               />
             </div>
             <div>
@@ -298,7 +333,9 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
+                min={startDate || new Date().toISOString().split('T')[0]} // End date must be after start date
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isSaving}
               />
             </div>
           </div>
@@ -313,13 +350,15 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
               placeholder={t('trip.descriptionPlaceholder')}
               rows={3}
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              disabled={isSaving}
             />
           </div>
         </div>
 
         <button
           onClick={() => setCurrentStep('members')}
-          className="w-full mt-6 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors"
+          className="w-full mt-6 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+          disabled={isSaving}
         >
           {t('trip.continueToMembers')}
         </button>
@@ -337,7 +376,8 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
           </h3>
           <button
             onClick={() => setShowAddMember(true)}
-            className="flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-purple-700 transition-colors"
+            className="flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-purple-700 transition-colors disabled:opacity-50"
+            disabled={isSaving}
           >
             <UserPlus size={16} />
             <span>{t('trip.addMember')}</span>
@@ -368,13 +408,15 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                   <div className="flex space-x-2">
                     <button
                       onClick={() => editMember(member)}
-                      className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                      className="p-2 text-gray-400 hover:text-blue-600 transition-colors disabled:opacity-50"
+                      disabled={isSaving}
                     >
                       <Edit3 size={16} />
                     </button>
                     <button
                       onClick={() => removeMember(member.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                      className="p-2 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                      disabled={isSaving}
                     >
                       <Trash2 size={16} />
                     </button>
@@ -388,13 +430,15 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
         <div className="flex space-x-3 mt-6">
           <button
             onClick={() => setCurrentStep('basic')}
-            className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+            className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+            disabled={isSaving}
           >
             {t('common.back')}
           </button>
           <button
             onClick={() => setCurrentStep('itinerary')}
-            className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors"
+            className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+            disabled={isSaving}
           >
             {t('trip.continueToItinerary')}
           </button>
@@ -416,7 +460,8 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
               </h3>
               <button
                 onClick={resetMemberForm}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                disabled={isSaving}
               >
                 <X size={20} className="text-gray-500" />
               </button>
@@ -434,6 +479,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                 onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })}
                 placeholder={t('trip.fullNamePlaceholder')}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                disabled={isSaving}
               />
             </div>
 
@@ -448,6 +494,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                 value={memberForm.age || 18}
                 onChange={(e) => setMemberForm({ ...memberForm, age: parseInt(e.target.value) })}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                disabled={isSaving}
               />
             </div>
 
@@ -459,6 +506,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                 value={memberForm.documentType || "aadhar"}
                 onChange={(e) => setMemberForm({ ...memberForm, documentType: e.target.value as 'aadhar' | 'passport' })}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                disabled={isSaving}
               >
                 <option value="aadhar">{t('trip.aadharCard')}</option>
                 <option value="passport">{t('trip.passport')}</option>
@@ -475,6 +523,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                 onChange={(e) => setMemberForm({ ...memberForm, documentNumber: e.target.value })}
                 placeholder={memberForm.documentType === 'aadhar' ? t('trip.aadharPlaceholder') : t('trip.passportPlaceholder')}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                disabled={isSaving}
               />
             </div>
 
@@ -485,14 +534,15 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                 </label>
                 <button
                   onClick={addPhoneNumber}
-                  className="text-purple-600 hover:text-purple-700 text-sm font-medium flex items-center"
+                  className="text-purple-600 hover:text-purple-700 text-sm font-medium flex items-center disabled:opacity-50"
+                  disabled={isSaving}
                 >
                   <Plus size={16} className="mr-1" />
                   {t('trip.addPhone')}
                 </button>
               </div>
               <div className="space-y-2">
-                {memberForm.phoneNumbers?.map((phone, index) => (
+                {memberForm.phoneNumbers?.map((phone) => (
                   <div key={phone.id} className="flex space-x-2">
                     <input
                       type="tel"
@@ -500,11 +550,13 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                       onChange={(e) => updatePhoneNumber(phone.id, 'number', e.target.value)}
                       placeholder={t('common.phone')}
                       className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                      disabled={isSaving}
                     />
                     <select
                       value={phone.type}
                       onChange={(e) => updatePhoneNumber(phone.id, 'type', e.target.value)}
                       className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                      disabled={isSaving}
                     >
                       <option value="primary">{t('trip.phoneType.primary')}</option>
                       <option value="emergency">{t('trip.phoneType.emergency')}</option>
@@ -513,7 +565,8 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                     {memberForm.phoneNumbers!.length > 1 && (
                       <button
                         onClick={() => removePhoneNumber(phone.id)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        disabled={isSaving}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -530,6 +583,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                   checked={memberForm.speciallyAbled || false}
                   onChange={(e) => setMemberForm({ ...memberForm, speciallyAbled: e.target.checked })}
                   className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                  disabled={isSaving}
                 />
                 <span className="text-sm font-medium text-gray-700">{t('trip.speciallyAbled')}</span>
               </label>
@@ -546,6 +600,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                   placeholder={t('trip.specialNeedsPlaceholder')}
                   rows={2}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                  disabled={isSaving}
                 />
               </div>
             )}
@@ -560,6 +615,7 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                 onChange={(e) => setMemberForm({ ...memberForm, emergencyContact: e.target.value })}
                 placeholder={t('trip.emergencyContactPlaceholder')}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                disabled={isSaving}
               />
             </div>
 
@@ -573,12 +629,14 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
                 onChange={(e) => setMemberForm({ ...memberForm, relation: e.target.value })}
                 placeholder={t('trip.relationshipPlaceholder')}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                disabled={isSaving}
               />
             </div>
 
             <button
               onClick={saveMember}
-              className="w-full bg-purple-600 text-white py-3 rounded-xl font-medium hover:bg-purple-700 transition-colors mt-6"
+              className="w-full bg-purple-600 text-white py-3 rounded-xl font-medium hover:bg-purple-700 transition-colors mt-6 disabled:opacity-50"
+              disabled={isSaving}
             >
               {editingMember ? t('trip.updateMember') : t('trip.addMember')}
             </button>
@@ -588,13 +646,14 @@ const AddTripScreen: React.FC<AddTripScreenProps> = ({ onBack, onSaveTrip }) => 
     );
   };
 
-const renderItinerary = () => (
+  const renderItinerary = () => (
     <div className="p-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-900">{t('trip.tripItinerary')}</h3>
         <button
           onClick={addItineraryDay}
-          className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center space-x-2"
+          className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
+          disabled={isSaving}
         >
           <Plus size={16} />
           <span>{t('trip.addDay')}</span>
@@ -616,7 +675,8 @@ const renderItinerary = () => (
                   <h4 className="font-medium text-gray-900">{t('trip.day')} {index + 1}</h4>
                   <button
                     onClick={() => removeItineraryDay(day.id)}
-                    className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                    className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                    disabled={isSaving}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -628,7 +688,10 @@ const renderItinerary = () => (
                       type="date"
                       value={day.date}
                       onChange={(e) => updateItinerary(day.id, 'date', e.target.value)}
+                      min={startDate}
+                      max={endDate}
                       className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                      disabled={isSaving}
                     />
                     <input
                       type="text"
@@ -636,6 +699,7 @@ const renderItinerary = () => (
                       onChange={(e) => updateItinerary(day.id, 'location', e.target.value)}
                       placeholder={t('common.location')}
                       className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                      disabled={isSaving}
                     />
                   </div>
 
@@ -644,7 +708,8 @@ const renderItinerary = () => (
                       <label className="text-sm font-medium text-gray-700">{t('trip.activities')}</label>
                       <button
                         onClick={() => addActivity(day.id)}
-                        className="text-green-600 hover:text-green-700 text-sm font-medium"
+                        className="text-green-600 hover:text-green-700 text-sm font-medium disabled:opacity-50"
+                        disabled={isSaving}
                       >
                         {t('trip.addActivity')}
                       </button>
@@ -658,11 +723,13 @@ const renderItinerary = () => (
                             onChange={(e) => updateActivity(day.id, activityIndex, e.target.value)}
                             placeholder={t('trip.activityPlaceholder')}
                             className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                            disabled={isSaving}
                           />
                           {day.activities.length > 1 && (
                             <button
                               onClick={() => removeActivity(day.id, activityIndex)}
-                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                              disabled={isSaving}
                             >
                               <X size={16} />
                             </button>
@@ -678,6 +745,7 @@ const renderItinerary = () => (
                     placeholder={t('trip.additionalNotes')}
                     rows={2}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none text-sm"
+                    disabled={isSaving}
                   />
                 </div>
               </div>
@@ -688,16 +756,27 @@ const renderItinerary = () => (
         <div className="flex space-x-3 mt-6">
           <button
             onClick={() => setCurrentStep('members')}
-            className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+            className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+            disabled={isSaving}
           >
             {t('common.back')}
           </button>
           <button
             onClick={handleSaveTrip}
-            className="flex-1 bg-green-600 text-white py-3 rounded-xl font-medium hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+            className="flex-1 bg-green-600 text-white py-3 rounded-xl font-medium hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
+            disabled={isSaving}
           >
-            <Save size={16} />
-            <span>{t('trip.saveTrip')}</span>
+            {isSaving ? (
+              <>
+                <Loader size={16} className="animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <Save size={16} />
+                <span>{t('trip.saveTrip')}</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -713,9 +792,10 @@ const renderItinerary = () => (
         rightAction={
           <button
             onClick={handleSaveTrip}
-            className="text-sm text-blue-600 font-medium"
+            className="text-sm text-blue-600 font-medium disabled:opacity-50"
+            disabled={isSaving}
           >
-            {t('common.save')}
+            {isSaving ? <Loader size={16} className="animate-spin" /> : t('common.save')}
           </button>
         }
       />
